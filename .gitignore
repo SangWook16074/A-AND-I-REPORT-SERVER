@@ -35,9 +35,13 @@ out/
 
 ### VS Code ###
 .vscode/
+.DS_Store
 
 ### Kotlin ###
 .kotlin
 
 ### .env ###
 .env*
+
+# Local private docs (do not commit/deploy)
+secret_docs/

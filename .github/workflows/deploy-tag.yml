@@ -1,0 +1,121 @@
+name: Deploy Tagged Report Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      APP_DIR: ${{ vars.APP_DIR || '/opt/aandi-report-server' }}
+      MONGO_DB_NAME: ${{ vars.MONGO_DB_NAME || 'aandi' }}
+      SWAGGER_URL: ${{ vars.SWAGGER_URL || 'http://localhost:8080' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate tag format
+        run: |
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag: ${GITHUB_REF_NAME}"
+            echo "Expected format: vX.Y.Z"
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: github-actions-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          IMAGE_URI: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
+        run: |
+          docker build -t "${IMAGE_URI}" .
+          docker push "${IMAGE_URI}"
+
+      - name: Deploy on instance via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          IMAGE_URI: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
+          APP_DIR: ${{ env.APP_DIR }}
+          MONGO_DB_NAME: ${{ env.MONGO_DB_NAME }}
+          SWAGGER_URL: ${{ env.SWAGGER_URL }}
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USER }}
+          key: ${{ secrets.AWS_SSH_KEY }}
+          port: ${{ vars.AWS_PORT || '22' }}
+          envs: AWS_REGION,IMAGE_URI,APP_DIR,MONGO_DB_NAME,SWAGGER_URL
+          script: |
+            set -euo pipefail
+
+            ECR_REGISTRY="$(echo "${IMAGE_URI}" | cut -d'/' -f1)"
+
+            aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+
+            mkdir -p "${APP_DIR}"
+            # Keep EOF single-quoted so ${...} remains for docker compose env interpolation time.
+            cat <<'EOF' > "${APP_DIR}/docker-compose.yml"
+            services:
+              mongodb:
+                image: mongo:7
+                container_name: aandi-report-mongodb
+                restart: always
+                volumes:
+                  - mongo_data:/data/db
+                healthcheck:
+                  test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' || exit 1"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+
+              report-server:
+                image: ${IMAGE_URI}
+                container_name: aandi-report-server
+                restart: always
+                depends_on:
+                  mongodb:
+                    condition: service_healthy
+                ports:
+                  - "8080:8080"
+                environment:
+                  SPRING_PROFILES_ACTIVE: prod
+                  MONGO_DB_URL: mongodb://mongodb:27017/${MONGO_DB_NAME}
+                  SWAGGER_URL: ${SWAGGER_URL}
+
+            volumes:
+              mongo_data:
+            EOF
+
+            cd "${APP_DIR}"
+            IMAGE_URI="${IMAGE_URI}" \
+            MONGO_DB_NAME="${MONGO_DB_NAME}" \
+            SWAGGER_URL="${SWAGGER_URL}" \
+            docker compose pull
+
+            IMAGE_URI="${IMAGE_URI}" \
+            MONGO_DB_NAME="${MONGO_DB_NAME}" \
+            SWAGGER_URL="${SWAGGER_URL}" \
+            docker compose up -d --remove-orphans
+
+            docker image prune -f --filter "until=72h"
