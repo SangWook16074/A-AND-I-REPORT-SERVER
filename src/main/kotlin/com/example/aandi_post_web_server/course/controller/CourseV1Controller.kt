@@ -35,7 +35,7 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
 @RestController
-@RequestMapping("/v1/courses")
+@RequestMapping("/v1/admin/courses")
 class CourseV1Controller(
     private val courseV1Service: CourseV1Service,
 ) {

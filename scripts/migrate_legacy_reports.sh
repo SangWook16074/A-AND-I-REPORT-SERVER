@@ -184,7 +184,7 @@ course_payload="$(jq -n \
   --arg description "$COURSE_DESCRIPTION" \
   '{slug:$slug,title:$title,description:$description}')"
 
-http_call POST "${API_BASE}/v1/courses" "$course_payload"
+http_call POST "${API_BASE}/v1/admin/courses" "$course_payload"
 if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" && "$HTTP_CODE" != "409" ]]; then
   echo "course create failed: HTTP $HTTP_CODE" >&2
   echo "$HTTP_BODY" >&2
@@ -226,7 +226,7 @@ while IFS= read -r line; do
     --argjson weekNo "$weekNo" \
     --arg title "$week_title" \
     '{weekNo:$weekNo,title:$title}')"
-  http_call POST "${API_BASE}/v1/courses/${COURSE_SLUG}/weeks" "$week_payload"
+  http_call POST "${API_BASE}/v1/admin/courses/${COURSE_SLUG}/weeks" "$week_payload"
   if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
     echo "week upsert failed (week=${weekNo}): HTTP $HTTP_CODE" >&2
     echo "$HTTP_BODY" >&2
@@ -256,14 +256,14 @@ while IFS= read -r line; do
       examples:$examples
     }')"
 
-  http_call POST "${API_BASE}/v1/courses/${COURSE_SLUG}/assignments" "$assignment_payload"
+  http_call POST "${API_BASE}/v1/admin/courses/${COURSE_SLUG}/assignments" "$assignment_payload"
   assignment_id=""
   if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "201" ]]; then
     assignment_id="$(jq -r '.id // empty' <<<"$HTTP_BODY")"
     created=$((created + 1))
   elif [[ "$HTTP_CODE" == "409" ]]; then
     skipped=$((skipped + 1))
-    http_call GET "${API_BASE}/v1/courses/${COURSE_SLUG}/assignments?weekNo=${weekNo}" ""
+    http_call GET "${API_BASE}/v1/admin/courses/${COURSE_SLUG}/assignments?weekNo=${weekNo}" ""
     if [[ "$HTTP_CODE" != "200" ]]; then
       echo "failed to load existing assignment (week=${weekNo}, seq=${seqInWeek}): HTTP $HTTP_CODE" >&2
       echo "$HTTP_BODY" >&2
@@ -281,7 +281,7 @@ while IFS= read -r line; do
     exit 1
   fi
 
-  http_call POST "${API_BASE}/v1/courses/${COURSE_SLUG}/assignments/${assignment_id}/publish" ""
+  http_call POST "${API_BASE}/v1/admin/courses/${COURSE_SLUG}/assignments/${assignment_id}/publish" ""
   if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "201" ]]; then
     published=$((published + 1))
   elif [[ "$HTTP_CODE" != "422" ]]; then
@@ -291,7 +291,7 @@ while IFS= read -r line; do
   fi
 
   if [[ "$DELIVER" == "true" ]]; then
-    http_call POST "${API_BASE}/v1/courses/${COURSE_SLUG}/assignments/${assignment_id}/deliveries" ""
+    http_call POST "${API_BASE}/v1/admin/courses/${COURSE_SLUG}/assignments/${assignment_id}/deliveries" ""
     if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
       echo "delivery failed (assignmentId=${assignment_id}): HTTP $HTTP_CODE" >&2
       echo "$HTTP_BODY" >&2
