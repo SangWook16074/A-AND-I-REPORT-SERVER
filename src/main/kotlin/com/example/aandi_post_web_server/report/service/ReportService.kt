@@ -18,50 +18,17 @@ class ReportService(
     private val reportRepository: ReportRepository,
 ) {
     suspend fun createReport(reportRequestDTO: ReportRequestDTO): Mono<Report> {
-        val report = Report(
-            week = reportRequestDTO.week,
-            seq = reportRequestDTO.seq,
-            title = reportRequestDTO.title,
-            content = reportRequestDTO.content,
-            requirement = reportRequestDTO.requirement,
-            objects = reportRequestDTO.objects,
-            exampleIO = reportRequestDTO.exampleIO,
-            reportType = reportRequestDTO.reportType,
-            startAt = reportRequestDTO.startAt.toInstant(),
-            endAt = reportRequestDTO.endAt.toInstant(),
-            level = reportRequestDTO.level
-        )
-        return reportRepository.save(report)
+        return reportRepository.save(reportRequestDTO.toEntity())
     }
 
-    suspend fun getAllReport(): Flux<Report>{
-        return reportRepository.findAll()
-    }
+    suspend fun getAllReport(): Flux<Report> = reportRepository.findAll()
 
-    // Report 업데이트
     suspend fun updateReport(id: String, reportRequestDTO: ReportRequestDTO): Mono<Report> {
         return reportRepository.findById(id)
             .switchIfEmpty(Mono.error(ResponseStatusException(HttpStatus.NOT_FOUND, "리포트를 찾을 수 없습니다: $id")))
-            .flatMap { existingReport ->
-                val updatedReport = Report(
-                    id = id,
-                    week = reportRequestDTO.week,
-                    seq = reportRequestDTO.seq,
-                    title = reportRequestDTO.title,
-                    content = reportRequestDTO.content,
-                    requirement = reportRequestDTO.requirement,
-                    objects = reportRequestDTO.objects,
-                    exampleIO = reportRequestDTO.exampleIO,
-                    reportType = reportRequestDTO.reportType,
-                    startAt = reportRequestDTO.startAt.toInstant(),
-                    endAt = reportRequestDTO.endAt.toInstant(),
-                    level = reportRequestDTO.level
-                )
-                reportRepository.save(updatedReport)
-            }
+            .flatMap { reportRepository.save(reportRequestDTO.toEntity(id)) }
     }
 
-    // Report 삭제
     suspend fun deleteReport(id: String): Mono<String> {
         return reportRepository.findById(id)
             .switchIfEmpty(Mono.error(ResponseStatusException(HttpStatus.NOT_FOUND, "리포트를 찾을 수 없습니다: $id")))
@@ -70,42 +37,55 @@ class ReportService(
             }
     }
 
-    // 진행 중인 리포트들의 요약 정보만 조회
     suspend fun getAllOngoingReportSummaries(): Flux<ReportSummaryDTO> {
         val now = Instant.now().atZone(ZoneId.of("UTC")).toInstant()
 
         return reportRepository.findAll()
             .filter { it.startAt.isBefore(now) }
-            .map { report ->
-                ReportSummaryDTO(
-                    id = report.id ?: "",
-                    seq = report.seq,
-                    week = report.week,
-                    title = report.title,
-                    level = report.level,
-                    reportType = report.reportType,
-                    endAt = report.endAt
-                )
-            }
+            .map { report -> report.toSummaryDto() }
     }
 
-    // 특정 ID의 Report 조회 (ReportDetailDTO 반환)
     suspend fun getReportDetailById(id: String): Mono<ReportDetailDTO> {
         return reportRepository.findById(id)
             .switchIfEmpty(Mono.error(ResponseStatusException(HttpStatus.NOT_FOUND, "리포트를 찾을 수 없습니다: $id")))
-            .map { report ->
-                ReportDetailDTO(
-                    id = report.id ?: "",
-                    week = report.week,
-                    title = report.title,
-                    content = report.content,
-                    requirement = report.requirement,
-                    objects = report.objects,
-                    exampleIo = report.exampleIO,
-                    reportType = report.reportType,
-                    endAt = report.endAt,
-                    level = report.level
-                )
-            }
+            .map { report -> report.toDetailDto() }
     }
+
+    private fun ReportRequestDTO.toEntity(id: String? = null): Report = Report(
+        id = id,
+        week = week,
+        seq = seq,
+        title = title,
+        content = content,
+        requirement = requirement,
+        objects = objects,
+        exampleIO = exampleIO,
+        reportType = reportType,
+        startAt = startAt.toInstant(),
+        endAt = endAt.toInstant(),
+        level = level,
+    )
+
+    private fun Report.toSummaryDto(): ReportSummaryDTO = ReportSummaryDTO(
+        id = id ?: "",
+        seq = seq,
+        week = week,
+        title = title,
+        level = level,
+        reportType = reportType,
+        endAt = endAt,
+    )
+
+    private fun Report.toDetailDto(): ReportDetailDTO = ReportDetailDTO(
+        id = id ?: "",
+        week = week,
+        title = title,
+        content = content,
+        requirement = requirement,
+        objects = objects,
+        exampleIo = exampleIO,
+        reportType = reportType,
+        endAt = endAt,
+        level = level,
+    )
 }
