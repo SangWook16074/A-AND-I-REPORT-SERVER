@@ -8,7 +8,9 @@ Usage:
   scripts/migrate_legacy_reports.sh \
     --backup /absolute/path/aandi_backup.tar.gz \
     --api-base http://localhost:8080 \
-    --token <ACCESS_TOKEN> \
+    [--token <ACCESS_TOKEN>] \
+    [--user-id legacy-migrator] \
+    [--user-role ADMIN] \
     --course-slug back-basic \
     --course-title "BACK 기초" \
     [--course-description "legacy 3기 이관"] \
@@ -40,16 +42,25 @@ http_call() {
   local url="$2"
   local payload="${3:-}"
   local response
+  local -a headers
+
+  headers=(
+    -H "X-User-Role: ${USER_ROLE}"
+    -H "X-User-Id: ${USER_ID}"
+  )
+  if [[ -n "$TOKEN" ]]; then
+    headers+=(-H "Authorization: Bearer ${TOKEN}")
+  fi
 
   if [[ -n "$payload" ]]; then
     response="$(curl -sS -w $'\n%{http_code}' -X "$method" \
-      -H "Authorization: Bearer ${TOKEN}" \
+      "${headers[@]}" \
       -H "Content-Type: application/json" \
       -d "$payload" \
       "$url")"
   else
     response="$(curl -sS -w $'\n%{http_code}' -X "$method" \
-      -H "Authorization: Bearer ${TOKEN}" \
+      "${headers[@]}" \
       "$url")"
   fi
 
@@ -71,6 +82,8 @@ level_to_difficulty() {
 BACKUP_PATH=""
 API_BASE=""
 TOKEN=""
+USER_ID="legacy-migrator"
+USER_ROLE="ADMIN"
 COURSE_SLUG=""
 COURSE_TITLE=""
 COURSE_DESCRIPTION="legacy migration"
@@ -82,6 +95,8 @@ while [[ $# -gt 0 ]]; do
     --backup) BACKUP_PATH="$2"; shift 2 ;;
     --api-base) API_BASE="$2"; shift 2 ;;
     --token) TOKEN="$2"; shift 2 ;;
+    --user-id) USER_ID="$2"; shift 2 ;;
+    --user-role) USER_ROLE="$2"; shift 2 ;;
     --course-slug) COURSE_SLUG="$2"; shift 2 ;;
     --course-title) COURSE_TITLE="$2"; shift 2 ;;
     --course-description) COURSE_DESCRIPTION="$2"; shift 2 ;;
@@ -92,8 +107,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$BACKUP_PATH" || -z "$API_BASE" || -z "$TOKEN" || -z "$COURSE_SLUG" || -z "$COURSE_TITLE" ]]; then
+if [[ -z "$BACKUP_PATH" || -z "$API_BASE" || -z "$COURSE_SLUG" || -z "$COURSE_TITLE" || -z "$USER_ID" || -z "$USER_ROLE" ]]; then
   usage
+  exit 1
+fi
+
+normalized_user_role="$(printf '%s' "$USER_ROLE" | tr '[:lower:]' '[:upper:]')"
+if [[ "$normalized_user_role" != "ADMIN" ]]; then
+  echo "legacy migration requires ADMIN role. --user-role must be ADMIN." >&2
   exit 1
 fi
 
@@ -121,36 +142,36 @@ bsondump "$tmpdir/$report_path" > "$tmpdir/legacy_report_raw.jsonl"
 
 jq -c '
   {
-    weekNo: ((.week.$numberInt // .week) | tonumber),
-    seqInWeek: ((.seq.$numberInt // .seq) | tonumber),
+    weekNo: ((.week."$numberInt" // .week) | tonumber),
+    seqInWeek: ((.seq."$numberInt" // .seq) | tonumber),
     title: .title,
     content: .content,
     requirements: (
       (.requirement // [])
-      | sort_by((.seq.$numberInt // .seq | tonumber))
+      | sort_by((.seq."$numberInt" // .seq | tonumber))
       | map({
-          sortOrder: ((.seq.$numberInt // .seq) | tonumber),
+          sortOrder: ((.seq."$numberInt" // .seq) | tonumber),
           requirementText: .content
         })
     ),
     goals: (
       (.objects // [])
-      | sort_by((.seq.$numberInt // .seq | tonumber))
+      | sort_by((.seq."$numberInt" // .seq | tonumber))
       | map(.content)
     ),
     examples: (
       (.exampleIO // [])
-      | sort_by((.seq.$numberInt // .seq | tonumber))
+      | sort_by((.seq."$numberInt" // .seq | tonumber))
       | map({
-          seq: ((.seq.$numberInt // .seq) | tonumber),
+          seq: ((.seq."$numberInt" // .seq) | tonumber),
           inputText: (.input // ""),
           outputText: (.output // ""),
           description: null
         })
     ),
     level: .level,
-    openAt: (((.startAt.$date.$numberLong // .startAt.$date // .startAt) | tonumber) / 1000 | todateiso8601),
-    dueAt: (((.endAt.$date.$numberLong // .endAt.$date // .endAt) | tonumber) / 1000 | todateiso8601)
+    openAt: (((.startAt."$date"."$numberLong" // .startAt."$date" // .startAt) | tonumber) / 1000 | todateiso8601),
+    dueAt: (((.endAt."$date"."$numberLong" // .endAt."$date" // .endAt) | tonumber) / 1000 | todateiso8601)
   }
 ' "$tmpdir/legacy_report_raw.jsonl" > "$tmpdir/legacy_report_normalized_unsorted.jsonl"
 
