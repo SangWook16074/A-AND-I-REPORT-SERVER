@@ -9,6 +9,8 @@ spring:
       uri: ${MONGO_DB_URL:mongodb://localhost:27017/aandi}
 
 springdoc:
+  api-docs:
+    path: /api/report/v3/api-docs
   swagger-ui:
     path: /swagger-ui/index.html
 
