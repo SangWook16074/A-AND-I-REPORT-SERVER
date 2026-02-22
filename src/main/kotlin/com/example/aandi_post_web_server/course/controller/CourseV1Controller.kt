@@ -2,12 +2,10 @@ package com.example.aandi_post_web_server.course.controller
 
 import com.example.aandi_post_web_server.assignment.dtos.AssignmentDeliveryResponse
 import com.example.aandi_post_web_server.assignment.dtos.AssignmentDetailResponse
-import com.example.aandi_post_web_server.assignment.dtos.AssignmentSummaryResponse
 import com.example.aandi_post_web_server.assignment.dtos.CreateAssignmentRequest
 import com.example.aandi_post_web_server.assignment.dtos.PublishAssignmentResponse
 import com.example.aandi_post_web_server.assignment.dtos.TriggerDeliveriesResponse
 import com.example.aandi_post_web_server.assignment.enum.AssignmentDeliveryStatus
-import com.example.aandi_post_web_server.assignment.enum.AssignmentStatus
 import com.example.aandi_post_web_server.course.dtos.CourseEnrollmentResponse
 import com.example.aandi_post_web_server.course.dtos.CourseResponse
 import com.example.aandi_post_web_server.course.dtos.CourseWeekResponse
@@ -16,7 +14,6 @@ import com.example.aandi_post_web_server.course.dtos.CreateCourseWeekRequest
 import com.example.aandi_post_web_server.course.dtos.EnrollCourseRequest
 import com.example.aandi_post_web_server.course.dtos.UpdateCourseRequest
 import com.example.aandi_post_web_server.course.dtos.UpdateEnrollmentRequest
-import com.example.aandi_post_web_server.course.enum.CourseStatus
 import com.example.aandi_post_web_server.course.service.CourseV1Service
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -68,24 +65,6 @@ class CourseV1Controller(
         return courseV1Service.archiveCourse(courseSlug)
     }
 
-    @GetMapping
-    fun getCourses(
-        @RequestParam(required = false) status: CourseStatus?,
-        @RequestHeader("X-User-Role") userRole: String,
-    ): Flux<CourseResponse> {
-        requireAdmin(userRole)
-        return courseV1Service.getCourses(status)
-    }
-
-    @GetMapping("/{courseSlug}")
-    fun getCourse(
-        @PathVariable courseSlug: String,
-        @RequestHeader("X-User-Role") userRole: String,
-    ): Mono<CourseResponse> {
-        requireAdmin(userRole)
-        return courseV1Service.getCourse(courseSlug)
-    }
-
     @PostMapping("/{courseSlug}/enrollments")
     fun enrollMember(
         @PathVariable courseSlug: String,
@@ -126,15 +105,6 @@ class CourseV1Controller(
         return courseV1Service.createWeek(courseSlug, request)
     }
 
-    @GetMapping("/{courseSlug}/weeks")
-    fun getWeeks(
-        @PathVariable courseSlug: String,
-        @RequestHeader("X-User-Role") userRole: String,
-    ): Flux<CourseWeekResponse> {
-        requireAdmin(userRole)
-        return courseV1Service.getWeeks(courseSlug)
-    }
-
     @PostMapping("/{courseSlug}/assignments")
     fun createAssignment(
         @PathVariable courseSlug: String,
@@ -154,55 +124,6 @@ class CourseV1Controller(
     ): Mono<PublishAssignmentResponse> {
         requireAdmin(userRole)
         return courseV1Service.publishAssignment(courseSlug, assignmentId)
-    }
-
-    @GetMapping("/{courseSlug}/weeks/{weekNo}/assignments")
-    fun getAssignmentsByWeek(
-        @PathVariable courseSlug: String,
-        @PathVariable weekNo: Int,
-        @RequestParam(required = false) status: AssignmentStatus?,
-        @RequestHeader("X-User-Role") userRole: String,
-    ): Flux<AssignmentSummaryResponse> {
-        requireAdmin(userRole)
-        return courseV1Service.getAssignmentsByWeek(
-            courseSlug = courseSlug,
-            weekNo = weekNo,
-            status = status,
-            requesterId = "admin",
-            isPrivileged = true,
-        )
-    }
-
-    @GetMapping("/{courseSlug}/assignments")
-    fun getAssignments(
-        @PathVariable courseSlug: String,
-        @RequestParam(required = false) weekNo: Int?,
-        @RequestParam(required = false) status: AssignmentStatus?,
-        @RequestHeader("X-User-Role") userRole: String,
-    ): Flux<AssignmentSummaryResponse> {
-        requireAdmin(userRole)
-        return courseV1Service.getAssignments(
-            courseSlug = courseSlug,
-            weekNo = weekNo,
-            status = status,
-            requesterId = "admin",
-            isPrivileged = true,
-        )
-    }
-
-    @GetMapping("/{courseSlug}/assignments/{assignmentId}")
-    fun getAssignmentDetail(
-        @PathVariable courseSlug: String,
-        @PathVariable assignmentId: String,
-        @RequestHeader("X-User-Role") userRole: String,
-    ): Mono<AssignmentDetailResponse> {
-        requireAdmin(userRole)
-        return courseV1Service.getAssignmentDetail(
-            courseSlug = courseSlug,
-            assignmentId = assignmentId,
-            requesterId = "admin",
-            isPrivileged = true,
-        )
     }
 
     @PostMapping("/{courseSlug}/assignments/{assignmentId}/deliveries")

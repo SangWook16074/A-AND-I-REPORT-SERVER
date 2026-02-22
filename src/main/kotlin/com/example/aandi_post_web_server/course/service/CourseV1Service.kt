@@ -75,27 +75,21 @@ class CourseV1Service(
         courseSlug: String,
         weekNo: Int,
         status: AssignmentStatus?,
-        requesterId: String,
-        isPrivileged: Boolean,
     ): Flux<AssignmentSummaryResponse> =
-        courseQueryService.getAssignmentsByWeek(courseSlug, weekNo, status, requesterId, isPrivileged)
+        courseQueryService.getAssignmentsByWeek(courseSlug, weekNo, status)
 
     fun getAssignments(
         courseSlug: String,
         weekNo: Int?,
         status: AssignmentStatus?,
-        requesterId: String,
-        isPrivileged: Boolean,
     ): Flux<AssignmentSummaryResponse> =
-        courseQueryService.getAssignments(courseSlug, weekNo, status, requesterId, isPrivileged)
+        courseQueryService.getAssignments(courseSlug, weekNo, status)
 
     fun getAssignmentDetail(
         courseSlug: String,
         assignmentId: String,
-        requesterId: String,
-        isPrivileged: Boolean,
     ): Mono<AssignmentDetailResponse> =
-        courseQueryService.getAssignmentDetail(courseSlug, assignmentId, requesterId, isPrivileged)
+        courseQueryService.getAssignmentDetail(courseSlug, assignmentId)
 
     fun triggerDeliveries(courseSlug: String, assignmentId: String): Mono<TriggerDeliveriesResponse> =
         courseCommandService.triggerDeliveries(courseSlug, assignmentId)

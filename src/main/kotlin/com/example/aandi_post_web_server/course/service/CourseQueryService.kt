@@ -1,6 +1,5 @@
 package com.example.aandi_post_web_server.course.service
 
-import com.example.aandi_post_web_server.assignment.domain.DeliveredAssignmentIds
 import com.example.aandi_post_web_server.assignment.dtos.AssignmentDeliveryResponse
 import com.example.aandi_post_web_server.assignment.dtos.AssignmentDetailResponse
 import com.example.aandi_post_web_server.assignment.dtos.AssignmentExampleResponse
@@ -17,7 +16,6 @@ import com.example.aandi_post_web_server.assignment.repository.AssignmentRequire
 import com.example.aandi_post_web_server.course.domain.AssignmentId
 import com.example.aandi_post_web_server.course.domain.CourseId
 import com.example.aandi_post_web_server.course.domain.CourseSlug
-import com.example.aandi_post_web_server.course.domain.UserId
 import com.example.aandi_post_web_server.course.domain.WeekNo
 import com.example.aandi_post_web_server.course.dtos.CourseEnrollmentResponse
 import com.example.aandi_post_web_server.course.dtos.CourseResponse
@@ -81,15 +79,11 @@ class CourseQueryService(
         courseSlug: String,
         weekNo: Int,
         status: AssignmentStatus?,
-        requesterId: String,
-        isPrivileged: Boolean,
     ): Flux<AssignmentSummaryResponse> {
         return getAssignments(
             courseSlug = courseSlug,
             weekNo = weekNo,
             status = status,
-            requesterId = requesterId,
-            isPrivileged = isPrivileged,
         )
     }
 
@@ -97,20 +91,14 @@ class CourseQueryService(
         courseSlug: String,
         weekNo: Int?,
         status: AssignmentStatus?,
-        requesterId: String,
-        isPrivileged: Boolean,
     ): Flux<AssignmentSummaryResponse> {
         val slug = parseCourseSlug(courseSlug)
-        val parsedRequesterId = parseUserId(requesterId)
         val parsedWeekNo = weekNo?.let { parseWeekNo(it) }
 
         return findCourseBySlug(slug)
             .flatMapMany { course ->
                 val courseId = parseCourseId(requireNotNull(course.id))
-                if (isPrivileged) {
-                    return@flatMapMany findAssignmentsByFilter(courseId, parsedWeekNo, status)
-                }
-                findDeliveredAssignmentsByFilter(courseId, parsedRequesterId, parsedWeekNo, status)
+                findAssignmentsByFilter(courseId, parsedWeekNo, status)
             }
             .sort(compareBy<Assignment> { it.weekNo }.thenBy { it.seqInWeek })
             .map(::toAssignmentSummaryResponse)
@@ -119,12 +107,9 @@ class CourseQueryService(
     fun getAssignmentDetail(
         courseSlug: String,
         assignmentId: String,
-        requesterId: String,
-        isPrivileged: Boolean,
     ): Mono<AssignmentDetailResponse> {
         val slug = parseCourseSlug(courseSlug)
         val parsedAssignmentId = parseAssignmentId(assignmentId)
-        val parsedRequesterId = parseUserId(requesterId)
 
         return findCourseBySlug(slug)
             .flatMap { course ->
@@ -132,24 +117,21 @@ class CourseQueryService(
                 assignmentRepository.findByIdAndCourseId(parsedAssignmentId.value, courseId.value)
                     .switchIfEmpty(Mono.error(ResponseStatusException(HttpStatus.NOT_FOUND, "과제를 찾을 수 없습니다: ${parsedAssignmentId.value}")))
                     .flatMap { assignment ->
-                        val authorizationMono = authorizeDetailAccess(isPrivileged, parsedAssignmentId, parsedRequesterId)
-                        authorizationMono.then(
-                            Mono.defer {
-                                assignmentRequirementRepository
-                                    .findAllByAssignmentIdOrderBySortOrder(parsedAssignmentId.value)
-                                    .map { AssignmentRequirementResponse(it.sortOrder, it.requirementText) }
-                                    .collectList()
-                                    .zipWith(
-                                        assignmentExampleRepository
-                                            .findAllByAssignmentIdOrderBySeq(parsedAssignmentId.value)
-                                            .map { AssignmentExampleResponse(it.seq, it.inputText, it.outputText, it.description) }
-                                            .collectList()
-                                    )
-                                    .map { tuple ->
-                                        toAssignmentDetailResponse(course.slug, assignment, tuple.t1, tuple.t2)
-                                    }
+                        Mono.defer {
+                            assignmentRequirementRepository
+                                .findAllByAssignmentIdOrderBySortOrder(parsedAssignmentId.value)
+                                .map { AssignmentRequirementResponse(it.sortOrder, it.requirementText) }
+                                .collectList()
+                                .zipWith(
+                                    assignmentExampleRepository
+                                        .findAllByAssignmentIdOrderBySeq(parsedAssignmentId.value)
+                                        .map { AssignmentExampleResponse(it.seq, it.inputText, it.outputText, it.description) }
+                                        .collectList()
+                                )
+                                .map { tuple ->
+                                    toAssignmentDetailResponse(course.slug, assignment, tuple.t1, tuple.t2)
+                                }
                             }
-                        )
                     }
             }
     }
@@ -197,44 +179,6 @@ class CourseQueryService(
         return assignmentRepository.findAllByCourseId(courseId.value)
     }
 
-    private fun findDeliveredAssignmentsByFilter(
-        courseId: CourseId,
-        requesterId: UserId,
-        weekNo: WeekNo?,
-        status: AssignmentStatus?,
-    ): Flux<Assignment> {
-        return assignmentDeliveryRepository.findAllByUserIdAndStatus(requesterId.value, AssignmentDeliveryStatus.DELIVERED)
-            .collectList()
-            .flatMapMany { deliveries ->
-                val deliveredAssignmentIds = DeliveredAssignmentIds.fromDeliveries(deliveries)
-                if (deliveredAssignmentIds.isEmpty()) {
-                    return@flatMapMany Flux.empty()
-                }
-                assignmentRepository.findAllByIdIn(deliveredAssignmentIds.asCollection())
-                    .filter { it.courseId == courseId.value }
-                    .filter { weekNo == null || it.weekNo == weekNo.value }
-                    .filter { status == null || it.status == status }
-            }
-    }
-
-    private fun authorizeDetailAccess(
-        isPrivileged: Boolean,
-        assignmentId: AssignmentId,
-        requesterId: UserId,
-    ): Mono<Void> {
-        if (isPrivileged) {
-            return Mono.empty()
-        }
-        return ensureDelivered(assignmentId, requesterId)
-    }
-
-    private fun ensureDelivered(assignmentId: AssignmentId, requesterId: UserId): Mono<Void> {
-        return assignmentDeliveryRepository.findByAssignmentIdAndUserId(assignmentId.value, requesterId.value)
-            .filter { it.status == AssignmentDeliveryStatus.DELIVERED }
-            .switchIfEmpty(Mono.error(ResponseStatusException(HttpStatus.FORBIDDEN, "배포되지 않은 과제입니다.")))
-            .then()
-    }
-
     private fun loadDeliveries(
         assignmentId: AssignmentId,
         status: AssignmentDeliveryStatus?,
@@ -265,9 +209,6 @@ class CourseQueryService(
 
     private fun parseWeekNo(raw: Int): WeekNo =
         parseOrBadRequest { WeekNo.from(raw) }
-
-    private fun parseUserId(raw: String): UserId =
-        parseOrBadRequest { UserId.from(raw) }
 
     private fun parseAssignmentId(raw: String): AssignmentId =
         parseOrBadRequest { AssignmentId.from(raw) }
