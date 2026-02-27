@@ -16,7 +16,7 @@ springdoc:
 
 swagger:
   server:
-    url: ${SWAGGER_URL:https://api.aandiclub.com}
+    url: ${SWAGGER_URL:https://api.aandiclub.com/v2/report}
 
 app:
   cors:
