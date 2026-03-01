@@ -25,7 +25,7 @@ import reactor.core.publisher.Mono
 
 @Tag(name = "REPORT API", description = "레포트 공지 게시글 API")
 @RestController
-@RequestMapping("/api/report")
+@RequestMapping("/v1/reports")
 class ReportController(
     private val reportService: ReportService,
 ) {
