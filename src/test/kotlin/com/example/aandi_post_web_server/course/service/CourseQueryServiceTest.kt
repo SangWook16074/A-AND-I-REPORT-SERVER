@@ -10,6 +10,8 @@ import com.example.aandi_post_web_server.assignment.repository.AssignmentExample
 import com.example.aandi_post_web_server.assignment.repository.AssignmentRepository
 import com.example.aandi_post_web_server.assignment.repository.AssignmentRequirementRepository
 import com.example.aandi_post_web_server.course.entity.Course
+import com.example.aandi_post_web_server.course.enum.CourseTrack
+import com.example.aandi_post_web_server.course.enum.UserTrack
 import com.example.aandi_post_web_server.course.repository.CourseEnrollmentRepository
 import com.example.aandi_post_web_server.course.repository.CourseRepository
 import com.example.aandi_post_web_server.course.repository.CourseWeekRepository
@@ -23,6 +25,42 @@ import reactor.test.StepVerifier
 import java.time.Instant
 
 class CourseQueryServiceTest : StringSpec({
+    "코스 조회는 track=FL이면 FL 코스만 반환한다" {
+        val fixture = QueryFixture()
+        val flCourse = Course(id = "course-1", title = "FL 기초", slug = "fl-basic", targetTrack = CourseTrack.FL)
+        val spCourse = Course(id = "course-2", title = "SP 기초", slug = "sp-basic", targetTrack = CourseTrack.SP)
+
+        Mockito.`when`(fixture.courseRepository.findAll()).thenReturn(Flux.just(flCourse, spCourse))
+
+        StepVerifier.create(
+            fixture.service.getCourses(
+                status = null,
+                phase = null,
+                track = UserTrack.FL,
+            ).map { it.slug }.collectList()
+        )
+            .assertNext { slugs ->
+                slugs.shouldContainExactly("fl-basic")
+            }
+            .verifyComplete()
+    }
+
+    "코스 조회는 track=NO이면 빈 목록을 반환한다" {
+        val fixture = QueryFixture()
+
+        StepVerifier.create(
+            fixture.service.getCourses(
+                status = null,
+                phase = null,
+                track = UserTrack.NO,
+            ).collectList()
+        )
+            .assertNext { courses ->
+                courses.size shouldBe 0
+            }
+            .verifyComplete()
+    }
+
     "배포 조회는 deliveredAt 기준 내림차순 정렬된다" {
         val fixture = QueryFixture()
         val course = Course(id = "course-1", title = "BACK 기초", slug = "back-basic")

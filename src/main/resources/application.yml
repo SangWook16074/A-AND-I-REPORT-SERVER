@@ -10,7 +10,7 @@ spring:
 
 springdoc:
   api-docs:
-    path: /api/report/v3/api-docs
+    path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui/index.html
 

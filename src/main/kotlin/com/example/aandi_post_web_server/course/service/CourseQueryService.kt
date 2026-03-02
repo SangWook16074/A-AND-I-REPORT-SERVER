@@ -23,7 +23,10 @@ import com.example.aandi_post_web_server.course.dtos.CourseWeekResponse
 import com.example.aandi_post_web_server.course.entity.Course
 import com.example.aandi_post_web_server.course.entity.CourseEnrollment
 import com.example.aandi_post_web_server.course.entity.CourseWeek
+import com.example.aandi_post_web_server.course.enum.CoursePhase
 import com.example.aandi_post_web_server.course.enum.CourseStatus
+import com.example.aandi_post_web_server.course.enum.CourseTrack
+import com.example.aandi_post_web_server.course.enum.UserTrack
 import com.example.aandi_post_web_server.course.repository.CourseEnrollmentRepository
 import com.example.aandi_post_web_server.course.repository.CourseRepository
 import com.example.aandi_post_web_server.course.repository.CourseWeekRepository
@@ -50,8 +53,17 @@ class CourseQueryService(
         return findCourseBySlug(slug).map(::toCourseResponse)
     }
 
-    fun getCourses(status: CourseStatus?): Flux<CourseResponse> =
-        loadCourses(status).map(::toCourseResponse)
+    fun getCourses(
+        status: CourseStatus?,
+        phase: CoursePhase?,
+        track: UserTrack?,
+    ): Flux<CourseResponse> {
+        if (track == UserTrack.NO) {
+            return Flux.empty()
+        }
+        val targetTrack = toCourseTrack(track)
+        return loadCourses(status, phase, targetTrack).map(::toCourseResponse)
+    }
 
     fun getEnrollments(courseSlug: String): Flux<CourseEnrollmentResponse> {
         val slug = parseCourseSlug(courseSlug)
@@ -136,6 +148,24 @@ class CourseQueryService(
             }
     }
 
+    fun getAssignmentCourse(assignmentId: String): Mono<CourseResponse> {
+        val parsedAssignmentId = parseAssignmentId(assignmentId)
+        return assignmentRepository.findById(parsedAssignmentId.value)
+            .switchIfEmpty(Mono.error(ResponseStatusException(HttpStatus.NOT_FOUND, "과제를 찾을 수 없습니다: ${parsedAssignmentId.value}")))
+            .flatMap { assignment ->
+                courseRepository.findById(assignment.courseId)
+                    .switchIfEmpty(
+                        Mono.error(
+                            ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "코스를 찾을 수 없습니다: ${assignment.courseId}",
+                            )
+                        )
+                    )
+            }
+            .map(::toCourseResponse)
+    }
+
     fun getDeliveries(
         courseSlug: String,
         assignmentId: String,
@@ -189,11 +219,15 @@ class CourseQueryService(
         return assignmentDeliveryRepository.findAllByAssignmentIdAndStatus(assignmentId.value, status)
     }
 
-    private fun loadCourses(status: CourseStatus?): Flux<Course> {
-        if (status == null) {
-            return courseRepository.findAll()
-        }
-        return courseRepository.findAllByStatus(status)
+    private fun loadCourses(
+        status: CourseStatus?,
+        phase: CoursePhase?,
+        targetTrack: CourseTrack?,
+    ): Flux<Course> {
+        return courseRepository.findAll()
+            .filter { course -> status == null || course.status == status }
+            .filter { course -> phase == null || course.phase == phase }
+            .filter { course -> targetTrack == null || course.targetTrack == targetTrack }
     }
 
     private fun findCourseBySlug(slug: CourseSlug): Mono<Course> {
@@ -213,6 +247,19 @@ class CourseQueryService(
     private fun parseAssignmentId(raw: String): AssignmentId =
         parseOrBadRequest { AssignmentId.from(raw) }
 
+    private fun toCourseTrack(userTrack: UserTrack?): CourseTrack? {
+        if (userTrack == null) {
+            return null
+        }
+        if (userTrack == UserTrack.FL) {
+            return CourseTrack.FL
+        }
+        if (userTrack == UserTrack.SP) {
+            return CourseTrack.SP
+        }
+        return null
+    }
+
     private fun <T> parseOrBadRequest(block: () -> T): T {
         return runCatching(block).getOrElse { error ->
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, error.message ?: "잘못된 요청입니다.")
@@ -224,6 +271,8 @@ class CourseQueryService(
         title = course.title,
         slug = course.slug,
         description = course.description,
+        phase = course.phase,
+        targetTrack = course.targetTrack,
         status = course.status,
         createdAt = course.createdAt,
         updatedAt = course.updatedAt,

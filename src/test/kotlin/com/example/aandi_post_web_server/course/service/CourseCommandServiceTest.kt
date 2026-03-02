@@ -14,6 +14,8 @@ import com.example.aandi_post_web_server.course.dtos.UpdateEnrollmentRequest
 import com.example.aandi_post_web_server.course.entity.Course
 import com.example.aandi_post_web_server.course.entity.CourseEnrollment
 import com.example.aandi_post_web_server.course.entity.CourseWeek
+import com.example.aandi_post_web_server.course.enum.CoursePhase
+import com.example.aandi_post_web_server.course.enum.CourseTrack
 import com.example.aandi_post_web_server.course.enum.EnrollmentStatus
 import com.example.aandi_post_web_server.course.repository.CourseEnrollmentRepository
 import com.example.aandi_post_web_server.course.repository.CourseRepository
@@ -42,6 +44,8 @@ class CourseCommandServiceTest : StringSpec({
                     title = "BACK 기초",
                     slug = "back-basic",
                     description = "desc",
+                    phase = CoursePhase.BASIC,
+                    targetTrack = CourseTrack.FL,
                 )
             )
         )

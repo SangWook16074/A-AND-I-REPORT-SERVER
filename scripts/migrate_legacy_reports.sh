@@ -14,6 +14,8 @@ Usage:
     --course-slug back-basic \
     --course-title "BACK 기초" \
     [--course-description "legacy 3기 이관"] \
+    [--course-phase BASIC] \
+    [--course-track FL] \
     [--title-suffix "-3rd"] \
     [--deliver]
 
@@ -68,17 +70,6 @@ http_call() {
   HTTP_CODE="$(printf '%s\n' "$response" | tail -n1)"
 }
 
-level_to_difficulty() {
-  local level="$1"
-  case "$level" in
-    LOW) echo "LOW" ;;
-    MEDIUM) echo "MID" ;;
-    HIGH) echo "HIGH" ;;
-    VERYHIGH) echo "VERY_HIGH" ;;
-    *) echo "MID" ;;
-  esac
-}
-
 BACKUP_PATH=""
 API_BASE=""
 TOKEN=""
@@ -87,6 +78,8 @@ USER_ROLE="ADMIN"
 COURSE_SLUG=""
 COURSE_TITLE=""
 COURSE_DESCRIPTION="legacy migration"
+COURSE_PHASE="BASIC"
+COURSE_TRACK="FL"
 TITLE_SUFFIX=""
 DELIVER="false"
 
@@ -100,6 +93,8 @@ while [[ $# -gt 0 ]]; do
     --course-slug) COURSE_SLUG="$2"; shift 2 ;;
     --course-title) COURSE_TITLE="$2"; shift 2 ;;
     --course-description) COURSE_DESCRIPTION="$2"; shift 2 ;;
+    --course-phase) COURSE_PHASE="$2"; shift 2 ;;
+    --course-track) COURSE_TRACK="$2"; shift 2 ;;
     --title-suffix) TITLE_SUFFIX="$2"; shift 2 ;;
     --deliver) DELIVER="true"; shift 1 ;;
     -h|--help) usage; exit 0 ;;
@@ -182,7 +177,9 @@ course_payload="$(jq -n \
   --arg slug "$COURSE_SLUG" \
   --arg title "$COURSE_TITLE" \
   --arg description "$COURSE_DESCRIPTION" \
-  '{slug:$slug,title:$title,description:$description}')"
+  --arg phase "$COURSE_PHASE" \
+  --arg targetTrack "$COURSE_TRACK" \
+  '{slug:$slug,title:$title,description:$description,phase:$phase,targetTrack:$targetTrack}')"
 
 http_call POST "${API_BASE}/v1/admin/courses" "$course_payload"
 if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" && "$HTTP_CODE" != "409" ]]; then
@@ -209,17 +206,11 @@ while IFS= read -r line; do
   content="$(jq -r '.content' <<<"$line")"
   openAt="$(jq -r '.openAt' <<<"$line")"
   dueAt="$(jq -r '.dueAt' <<<"$line")"
-  level="$(jq -r '.level' <<<"$line")"
-  difficulty="$(level_to_difficulty "$level")"
-  requirements_json="$(jq -c '.requirements' <<<"$line")"
-  examples_json="$(jq -c '.examples' <<<"$line")"
-  goals_md="$(jq -r '.goals | if length == 0 then "" else map("- " + .) | join("\n") end' <<<"$line")"
-
-  if [[ -n "$goals_md" ]]; then
-    content_md="${content}"$'\n\n'"## 학습 정리 목표 (Legacy)"$'\n'"${goals_md}"
-  else
-    content_md="${content}"
-  fi
+  level="$(jq -r '.level // "MEDIUM"' <<<"$line")"
+  report_type="$(jq -r '.reportType // "CS"' <<<"$line")"
+  requirements_json="$(jq -c '.requirements | map({seq:.sortOrder,content:.requirementText})' <<<"$line")"
+  objects_json="$(jq -c '.goals | to_entries | map({seq:(.key + 1), content:.value})' <<<"$line")"
+  examples_json="$(jq -c '.examples | map({seq:.seq,input:.inputText,output:.outputText})' <<<"$line")"
 
   week_title="${weekNo}주차"
   week_payload="$(jq -n \
@@ -234,26 +225,30 @@ while IFS= read -r line; do
   fi
 
   assignment_payload="$(jq -n \
-    --argjson weekNo "$weekNo" \
-    --argjson seqInWeek "$seqInWeek" \
+    --argjson week "$weekNo" \
+    --argjson seq "$seqInWeek" \
     --arg title "$title" \
-    --arg difficulty "$difficulty" \
-    --arg contentMd "$content_md" \
-    --arg openAt "$openAt" \
-    --arg dueAt "$dueAt" \
-    --argjson requirements "$requirements_json" \
-    --argjson examples "$examples_json" \
+    --arg content "$content" \
+    --arg reportType "$report_type" \
+    --arg startAt "$openAt" \
+    --arg endAt "$dueAt" \
+    --arg level "$level" \
+    --argjson requirement "$requirements_json" \
+    --argjson objects "$objects_json" \
+    --argjson exampleIO "$examples_json" \
     '{
-      weekNo:$weekNo,
-      seqInWeek:$seqInWeek,
+      week:$week,
+      seq:$seq,
       title:$title,
-      difficulty:$difficulty,
-      contentMd:$contentMd,
-      timeLimitMinutes:60,
-      openAt:$openAt,
-      dueAt:$dueAt,
-      requirements:$requirements,
-      examples:$examples
+      content:$content,
+      requirement:$requirement,
+      objects:$objects,
+      exampleIO:$exampleIO,
+      reportType:$reportType,
+      startAt:$startAt,
+      endAt:$endAt,
+      level:$level,
+      timeLimitMinutes:60
     }')"
 
   http_call POST "${API_BASE}/v1/admin/courses/${COURSE_SLUG}/assignments" "$assignment_payload"
@@ -263,13 +258,13 @@ while IFS= read -r line; do
     created=$((created + 1))
   elif [[ "$HTTP_CODE" == "409" ]]; then
     skipped=$((skipped + 1))
-    http_call GET "${API_BASE}/v1/admin/courses/${COURSE_SLUG}/assignments?weekNo=${weekNo}" ""
+    http_call GET "${API_BASE}/v1/courses/${COURSE_SLUG}/assignments?week=${weekNo}" ""
     if [[ "$HTTP_CODE" != "200" ]]; then
       echo "failed to load existing assignment (week=${weekNo}, seq=${seqInWeek}): HTTP $HTTP_CODE" >&2
       echo "$HTTP_BODY" >&2
       exit 1
     fi
-    assignment_id="$(jq -r --argjson seq "$seqInWeek" '.[] | select(.seqInWeek == $seq) | .id' <<<"$HTTP_BODY" | head -n1)"
+    assignment_id="$(jq -r --argjson seq "$seqInWeek" '.[] | select((.seq // .seqInWeek) == $seq) | .id' <<<"$HTTP_BODY" | head -n1)"
   else
     echo "assignment create failed (week=${weekNo}, seq=${seqInWeek}): HTTP $HTTP_CODE" >&2
     echo "$HTTP_BODY" >&2
