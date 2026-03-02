@@ -77,6 +77,8 @@ class CourseCommandService(
                 val updated = course.copy(
                     title = request.title?.trim()?.takeIf { it.isNotBlank() } ?: course.title,
                     description = request.description?.trim() ?: course.description,
+                    phase = request.phase ?: course.phase,
+                    targetTrack = request.targetTrack ?: course.targetTrack,
                     status = request.status ?: course.status,
                     updatedAt = Instant.now(),
                 )
@@ -254,6 +256,7 @@ class CourseCommandService(
                                 assignmentRepository.save(
                                     Assignment(
                                         courseId = courseId.value,
+                                        courseSlug = course.slug,
                                         createdBy = createdBy,
                                         weekNo = weekNo.value,
                                         seqInWeek = request.seqInWeek,
@@ -322,6 +325,8 @@ class CourseCommandService(
             title = request.title.trim(),
             slug = slug.value,
             description = request.description?.trim(),
+            phase = request.phase,
+            targetTrack = request.targetTrack,
             status = CourseStatus.ACTIVE,
             createdAt = now,
             updatedAt = now,
@@ -519,6 +524,8 @@ class CourseCommandService(
         title = course.title,
         slug = course.slug,
         description = course.description,
+        phase = course.phase,
+        targetTrack = course.targetTrack,
         status = course.status,
         createdAt = course.createdAt,
         updatedAt = course.updatedAt,

@@ -7,7 +7,10 @@ import com.example.aandi_post_web_server.assignment.enum.AssignmentDifficulty
 import com.example.aandi_post_web_server.assignment.enum.AssignmentStatus
 import com.example.aandi_post_web_server.course.dtos.CreateCourseRequest
 import com.example.aandi_post_web_server.course.dtos.CourseResponse
+import com.example.aandi_post_web_server.course.enum.CoursePhase
 import com.example.aandi_post_web_server.course.enum.CourseStatus
+import com.example.aandi_post_web_server.course.enum.CourseTrack
+import com.example.aandi_post_web_server.course.enum.UserTrack
 import com.example.aandi_post_web_server.course.service.CourseV1Service
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.extensions.spring.SpringExtension
@@ -38,7 +41,7 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
 
         "public 조회 API는 권한 헤더 없이 호출 가능하다" {
             val response = sampleCourseResponse()
-            Mockito.`when`(courseV1Service.getCourses(null)).thenReturn(Flux.just(response))
+            Mockito.`when`(courseV1Service.getCourses(null, null, null)).thenReturn(Flux.just(response))
 
             webTestClient.get()
                 .uri("/v1/courses")
@@ -61,6 +64,37 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                 .jsonPath("$.id").isEqualTo("assignment-1")
         }
 
+        "과제 ID로 코스 조회 API는 권한 헤더 없이 호출 가능하다" {
+            val response = sampleCourseResponse()
+            Mockito.`when`(courseV1Service.getAssignmentCourse("assignment-1"))
+                .thenReturn(Mono.just(response))
+
+            webTestClient.get()
+                .uri("/v1/courses/assignments/assignment-1/course")
+                .exchange()
+                .expectStatus().isOk
+                .expectBody()
+                .jsonPath("$.slug").isEqualTo("back-basic")
+        }
+
+        "코스 조회 API는 track 쿼리 파라미터로 필터링 호출한다" {
+            val response = sampleCourseResponse()
+            Mockito.`when`(
+                courseV1Service.getCourses(
+                    status = null,
+                    phase = null,
+                    track = UserTrack.FL,
+                )
+            ).thenReturn(Flux.just(response))
+
+            webTestClient.get()
+                .uri("/v1/courses?track=FL")
+                .exchange()
+                .expectStatus().isOk
+                .expectBody()
+                .jsonPath("$[0].targetTrack").isEqualTo("FL")
+        }
+
         "admin API는 ADMIN이 아니면 403을 반환한다" {
             webTestClient.post()
                 .uri("/v1/admin/courses")
@@ -70,6 +104,8 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                         "title" to "BACK 기초",
                         "slug" to "back-basic",
                         "description" to "desc",
+                        "phase" to "BASIC",
+                        "targetTrack" to "FL",
                     )
                 )
                 .exchange()
@@ -84,6 +120,8 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                         title = "BACK 기초",
                         slug = "back-basic",
                         description = "desc",
+                        phase = CoursePhase.BASIC,
+                        targetTrack = CourseTrack.FL,
                     )
                 )
             ).thenReturn(Mono.just(response))
@@ -96,6 +134,8 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                         "title" to "BACK 기초",
                         "slug" to "back-basic",
                         "description" to "desc",
+                        "phase" to "BASIC",
+                        "targetTrack" to "FL",
                     )
                 )
                 .exchange()
@@ -148,6 +188,8 @@ private fun sampleCourseResponse(): CourseResponse {
         title = "BACK 기초",
         slug = "back-basic",
         description = "desc",
+        phase = CoursePhase.BASIC,
+        targetTrack = CourseTrack.FL,
         status = CourseStatus.ACTIVE,
         createdAt = now,
         updatedAt = now,

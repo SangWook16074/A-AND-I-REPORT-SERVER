@@ -21,7 +21,7 @@ class SwaggerConfig(
 
     private fun swaggerInfo(): Info = Info()
         .title("Report Service API")
-        .description("Reactive report API for courses and assignments")
+        .description("코스/과제 운영 API 문서")
         .version("v1")
         .license(License().name("Proprietary"))
 }

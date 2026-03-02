@@ -13,6 +13,7 @@ data class Assignment(
     @Id
     val id: String? = null,
     val courseId: String,
+    val courseSlug: String = "",
     val createdBy: String,
     val weekNo: Int,
     val seqInWeek: Int,

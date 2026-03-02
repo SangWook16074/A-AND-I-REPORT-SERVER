@@ -16,7 +16,9 @@ import com.example.aandi_post_web_server.course.dtos.CreateCourseWeekRequest
 import com.example.aandi_post_web_server.course.dtos.EnrollCourseRequest
 import com.example.aandi_post_web_server.course.dtos.UpdateCourseRequest
 import com.example.aandi_post_web_server.course.dtos.UpdateEnrollmentRequest
+import com.example.aandi_post_web_server.course.enum.CoursePhase
 import com.example.aandi_post_web_server.course.enum.CourseStatus
+import com.example.aandi_post_web_server.course.enum.UserTrack
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -39,8 +41,12 @@ class CourseV1Service(
     fun getCourse(courseSlug: String): Mono<CourseResponse> =
         courseQueryService.getCourse(courseSlug)
 
-    fun getCourses(status: CourseStatus?): Flux<CourseResponse> =
-        courseQueryService.getCourses(status)
+    fun getCourses(
+        status: CourseStatus?,
+        phase: CoursePhase?,
+        track: UserTrack?,
+    ): Flux<CourseResponse> =
+        courseQueryService.getCourses(status, phase, track)
 
     fun enrollMember(courseSlug: String, request: EnrollCourseRequest): Mono<CourseEnrollmentResponse> =
         courseCommandService.enrollMember(courseSlug, request)
@@ -90,6 +96,9 @@ class CourseV1Service(
         assignmentId: String,
     ): Mono<AssignmentDetailResponse> =
         courseQueryService.getAssignmentDetail(courseSlug, assignmentId)
+
+    fun getAssignmentCourse(assignmentId: String): Mono<CourseResponse> =
+        courseQueryService.getAssignmentCourse(assignmentId)
 
     fun triggerDeliveries(courseSlug: String, assignmentId: String): Mono<TriggerDeliveriesResponse> =
         courseCommandService.triggerDeliveries(courseSlug, assignmentId)
