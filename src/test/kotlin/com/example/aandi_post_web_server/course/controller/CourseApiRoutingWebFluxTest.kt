@@ -2,9 +2,12 @@ package com.example.aandi_post_web_server.course.controller
 
 import com.example.aandi_post_web_server.assignment.dtos.AssignmentDeliveryResponse
 import com.example.aandi_post_web_server.assignment.dtos.AssignmentDetailResponse
+import com.example.aandi_post_web_server.assignment.dtos.CreateAssignmentRequest
+import com.example.aandi_post_web_server.assignment.dtos.LegacyAssignmentLevel
 import com.example.aandi_post_web_server.assignment.enum.AssignmentDeliveryStatus
 import com.example.aandi_post_web_server.assignment.enum.AssignmentDifficulty
 import com.example.aandi_post_web_server.assignment.enum.AssignmentStatus
+import com.example.aandi_post_web_server.common.security.SecurityConfig
 import com.example.aandi_post_web_server.course.dtos.CreateCourseRequest
 import com.example.aandi_post_web_server.course.dtos.CourseResponse
 import com.example.aandi_post_web_server.course.enum.CoursePhase
@@ -18,12 +21,16 @@ import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest
 import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.context.annotation.Import
+import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers.mockJwt
 import org.springframework.test.web.reactive.server.WebTestClient
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import java.time.Instant
 
 @WebFluxTest(controllers = [CourseV1Controller::class, CourseQueryV1Controller::class])
+@Import(SecurityConfig::class)
 class CourseApiRoutingWebFluxTest : StringSpec() {
 
     override fun extensions() = listOf(SpringExtension)
@@ -96,9 +103,10 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
         }
 
         "admin API는 ADMIN이 아니면 403을 반환한다" {
-            webTestClient.post()
+            webTestClient.mutateWith(
+                mockJwt().authorities(SimpleGrantedAuthority("ROLE_USER")),
+            ).post()
                 .uri("/v1/admin/courses")
-                .header("X-User-Role", "USER")
                 .bodyValue(
                     mapOf(
                         "title" to "BACK 기초",
@@ -110,6 +118,22 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                 )
                 .exchange()
                 .expectStatus().isForbidden
+        }
+
+        "admin API는 토큰이 없으면 401을 반환한다" {
+            webTestClient.post()
+                .uri("/v1/admin/courses")
+                .bodyValue(
+                    mapOf(
+                        "title" to "BACK 기초",
+                        "slug" to "back-basic",
+                        "description" to "desc",
+                        "phase" to "BASIC",
+                        "targetTrack" to "FL",
+                    ),
+                )
+                .exchange()
+                .expectStatus().isUnauthorized
         }
 
         "admin API는 ADMIN 헤더로 호출하면 성공한다" {
@@ -126,9 +150,12 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                 )
             ).thenReturn(Mono.just(response))
 
-            webTestClient.post()
+            webTestClient.mutateWith(
+                mockJwt().jwt { jwt ->
+                    jwt.subject("8ee88b63-526d-49dc-9e72-a96be0f81385")
+                }.authorities(SimpleGrantedAuthority("ROLE_ADMIN")),
+            ).post()
                 .uri("/v1/admin/courses")
-                .header("X-User-Role", "ADMIN")
                 .bodyValue(
                     mapOf(
                         "title" to "BACK 기초",
@@ -144,15 +171,74 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                 .jsonPath("$.slug").isEqualTo("back-basic")
         }
 
+        "과제 생성은 JWT subject를 createdBy로 전달한다" {
+            val response = sampleAssignmentDetailResponse()
+            val request = CreateAssignmentRequest(
+                week = 1,
+                seq = 1,
+                title = "터미널 계산기",
+                content = "문제 본문",
+                requirement = emptyList(),
+                objects = emptyList(),
+                exampleIO = emptyList(),
+                reportType = "CS",
+                startAt = Instant.parse("2026-03-01T00:00:00Z"),
+                endAt = Instant.parse("2026-03-02T00:00:00Z"),
+                level = LegacyAssignmentLevel.MEDIUM,
+                timeLimitMinutes = 60,
+            )
+            Mockito.`when`(
+                courseV1Service.createAssignment(
+                    "back-basic",
+                    request,
+                    "8ee88b63-526d-49dc-9e72-a96be0f81385",
+                ),
+            ).thenReturn(Mono.just(response))
+
+            webTestClient.mutateWith(
+                mockJwt().jwt { jwt ->
+                    jwt.subject("8ee88b63-526d-49dc-9e72-a96be0f81385")
+                }.authorities(SimpleGrantedAuthority("ROLE_ADMIN")),
+            ).post()
+                .uri("/v1/admin/courses/back-basic/assignments")
+                .bodyValue(
+                    mapOf(
+                        "week" to 1,
+                        "seq" to 1,
+                        "title" to "터미널 계산기",
+                        "content" to "문제 본문",
+                        "requirement" to emptyList<Map<String, Any>>(),
+                        "objects" to emptyList<Map<String, Any>>(),
+                        "exampleIO" to emptyList<Map<String, Any>>(),
+                        "reportType" to "CS",
+                        "startAt" to "2026-03-01T00:00:00Z",
+                        "endAt" to "2026-03-02T00:00:00Z",
+                        "level" to "MEDIUM",
+                        "timeLimitMinutes" to 60,
+                    ),
+                )
+                .exchange()
+                .expectStatus().isOk
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("assignment-1")
+
+            Mockito.verify(courseV1Service).createAssignment(
+                "back-basic",
+                request,
+                "8ee88b63-526d-49dc-9e72-a96be0f81385",
+            )
+        }
+
         "admin 배포 조회 API는 ADMIN이 아니면 403을 반환한다" {
-            webTestClient.get()
+            webTestClient.mutateWith(
+                mockJwt().authorities(SimpleGrantedAuthority("ROLE_USER")),
+            ).get()
                 .uri("/v1/admin/courses/back-basic/assignments/assignment-1/deliveries?status=DELIVERED")
-                .header("X-User-Role", "USER")
                 .exchange()
                 .expectStatus().isForbidden
         }
 
-        "admin 배포 조회 API는 ADMIN 헤더로 호출하면 성공한다" {
+        "admin 배포 조회 API는 ADMIN 토큰으로 호출하면 성공한다" {
             Mockito.`when`(
                 courseV1Service.getDeliveries(
                     "back-basic",
@@ -170,9 +256,10 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                 )
             )
 
-            webTestClient.get()
+            webTestClient.mutateWith(
+                mockJwt().authorities(SimpleGrantedAuthority("ROLE_ADMIN")),
+            ).get()
                 .uri("/v1/admin/courses/back-basic/assignments/assignment-1/deliveries?status=DELIVERED")
-                .header("X-User-Role", "ADMIN")
                 .exchange()
                 .expectStatus().isOk
                 .expectBody()

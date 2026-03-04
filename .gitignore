@@ -45,3 +45,6 @@ out/
 
 # Local private docs (do not commit/deploy)
 secret_docs/
+
+# Local profile override
+src/main/resources/application-local.yml
