@@ -98,7 +98,7 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
         "admin API는 ADMIN이 아니면 403을 반환한다" {
             webTestClient.post()
                 .uri("/v1/admin/courses")
-                .header("X-User-Role", "USER")
+                .header("X-Roles", "USER")
                 .bodyValue(
                     mapOf(
                         "title" to "BACK 기초",
@@ -128,7 +128,7 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
 
             webTestClient.post()
                 .uri("/v1/admin/courses")
-                .header("X-User-Role", "ADMIN")
+                .header("X-Roles", "ADMIN")
                 .bodyValue(
                     mapOf(
                         "title" to "BACK 기초",
@@ -147,7 +147,7 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
         "admin 배포 조회 API는 ADMIN이 아니면 403을 반환한다" {
             webTestClient.get()
                 .uri("/v1/admin/courses/back-basic/assignments/assignment-1/deliveries?status=DELIVERED")
-                .header("X-User-Role", "USER")
+                .header("X-Roles", "USER")
                 .exchange()
                 .expectStatus().isForbidden
         }
@@ -172,7 +172,7 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
 
             webTestClient.get()
                 .uri("/v1/admin/courses/back-basic/assignments/assignment-1/deliveries?status=DELIVERED")
-                .header("X-User-Role", "ADMIN")
+                .header("X-Roles", "ADMIN")
                 .exchange()
                 .expectStatus().isOk
                 .expectBody()

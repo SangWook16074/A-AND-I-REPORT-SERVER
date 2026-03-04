@@ -59,7 +59,7 @@ class CourseV1Controller(
     fun createCourse(
         @Valid @RequestBody request: CreateCourseRequest,
         @Parameter(description = "사용자 권한", example = "ADMIN")
-        @RequestHeader("X-User-Role") userRole: String,
+        @RequestHeader("X-Roles") userRole: String,
     ): Mono<CourseResponse> {
         requireAdmin(userRole)
         return courseV1Service.createCourse(request)
@@ -79,7 +79,7 @@ class CourseV1Controller(
         @PathVariable courseSlug: String,
         @RequestBody request: UpdateCourseRequest,
         @Parameter(description = "사용자 권한", example = "ADMIN")
-        @RequestHeader("X-User-Role") userRole: String,
+        @RequestHeader("X-Roles") userRole: String,
     ): Mono<CourseResponse> {
         requireAdmin(userRole)
         return courseV1Service.updateCourse(courseSlug, request)
@@ -98,7 +98,7 @@ class CourseV1Controller(
         @Parameter(description = "코스 슬러그", example = "back-basic")
         @PathVariable courseSlug: String,
         @Parameter(description = "사용자 권한", example = "ADMIN")
-        @RequestHeader("X-User-Role") userRole: String,
+        @RequestHeader("X-Roles") userRole: String,
     ): Mono<Void> {
         requireAdmin(userRole)
         return courseV1Service.archiveCourse(courseSlug)
@@ -118,7 +118,7 @@ class CourseV1Controller(
         @PathVariable courseSlug: String,
         @Valid @RequestBody request: EnrollCourseRequest,
         @Parameter(description = "사용자 권한", example = "ADMIN")
-        @RequestHeader("X-User-Role") userRole: String,
+        @RequestHeader("X-Roles") userRole: String,
     ): Mono<CourseEnrollmentResponse> {
         requireAdmin(userRole)
         return courseV1Service.enrollMember(courseSlug, request)
@@ -141,7 +141,7 @@ class CourseV1Controller(
         @PathVariable userId: String,
         @RequestBody request: UpdateEnrollmentRequest,
         @Parameter(description = "사용자 권한", example = "ADMIN")
-        @RequestHeader("X-User-Role") userRole: String,
+        @RequestHeader("X-Roles") userRole: String,
     ): Mono<CourseEnrollmentResponse> {
         requireAdmin(userRole)
         return courseV1Service.updateEnrollmentStatus(courseSlug, userId, request)
@@ -164,7 +164,7 @@ class CourseV1Controller(
         @Parameter(description = "코스 슬러그", example = "back-basic")
         @PathVariable courseSlug: String,
         @Parameter(description = "사용자 권한", example = "ADMIN")
-        @RequestHeader("X-User-Role") userRole: String,
+        @RequestHeader("X-Roles") userRole: String,
     ): Flux<CourseEnrollmentResponse> {
         requireAdmin(userRole)
         return courseV1Service.getEnrollments(courseSlug)
@@ -185,7 +185,7 @@ class CourseV1Controller(
         @PathVariable courseSlug: String,
         @Valid @RequestBody request: CreateCourseWeekRequest,
         @Parameter(description = "사용자 권한", example = "ADMIN")
-        @RequestHeader("X-User-Role") userRole: String,
+        @RequestHeader("X-Roles") userRole: String,
     ): Mono<CourseWeekResponse> {
         requireAdmin(userRole)
         return courseV1Service.createWeek(courseSlug, request)
@@ -209,7 +209,7 @@ class CourseV1Controller(
         @Parameter(description = "요청자 유저 ID", example = "admin-user")
         @RequestHeader("X-User-Id") requesterId: String,
         @Parameter(description = "사용자 권한", example = "ADMIN")
-        @RequestHeader("X-User-Role") userRole: String,
+        @RequestHeader("X-Roles") userRole: String,
     ): Mono<AssignmentDetailResponse> {
         requireAdmin(userRole)
         return courseV1Service.createAssignment(courseSlug, request, requesterId)
@@ -231,7 +231,7 @@ class CourseV1Controller(
         @Parameter(description = "과제 ID", example = "assignment-1")
         @PathVariable assignmentId: String,
         @Parameter(description = "사용자 권한", example = "ADMIN")
-        @RequestHeader("X-User-Role") userRole: String,
+        @RequestHeader("X-Roles") userRole: String,
     ): Mono<PublishAssignmentResponse> {
         requireAdmin(userRole)
         return courseV1Service.publishAssignment(courseSlug, assignmentId)
@@ -253,7 +253,7 @@ class CourseV1Controller(
         @Parameter(description = "과제 ID", example = "assignment-1")
         @PathVariable assignmentId: String,
         @Parameter(description = "사용자 권한", example = "ADMIN")
-        @RequestHeader("X-User-Role") userRole: String,
+        @RequestHeader("X-Roles") userRole: String,
     ): Mono<TriggerDeliveriesResponse> {
         requireAdmin(userRole)
         return courseV1Service.triggerDeliveries(courseSlug, assignmentId)
@@ -281,17 +281,23 @@ class CourseV1Controller(
         @Parameter(description = "배포 상태 필터", example = "DELIVERED")
         @RequestParam(required = false) status: AssignmentDeliveryStatus?,
         @Parameter(description = "사용자 권한", example = "ADMIN")
-        @RequestHeader("X-User-Role") userRole: String,
+        @RequestHeader("X-Roles") userRole: String,
     ): Flux<AssignmentDeliveryResponse> {
         requireAdmin(userRole)
         return courseV1Service.getDeliveries(courseSlug, assignmentId, status)
     }
 
-    private fun requireAdmin(userRole: String) {
-        if (normalizeRole(userRole) != "ADMIN") {
+    private fun requireAdmin(rolesHeader: String) {
+        val roles = rolesHeader
+            .split(",")
+            .map(::normalizeRole)
+            .filter { it.isNotBlank() }
+            .toSet()
+
+        if ("ADMIN" !in roles) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "허용되지 않은 권한입니다.")
         }
     }
 
-    private fun normalizeRole(role: String): String = role.trim().uppercase()
+    private fun normalizeRole(role: String): String = role.trim().uppercase().removePrefix("ROLE_")
 }
