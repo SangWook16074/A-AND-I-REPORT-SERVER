@@ -258,7 +258,7 @@ while IFS= read -r line; do
     created=$((created + 1))
   elif [[ "$HTTP_CODE" == "409" ]]; then
     skipped=$((skipped + 1))
-    http_call GET "${API_BASE}/v2/report/courses/${COURSE_SLUG}/assignments?week=${weekNo}" ""
+    http_call GET "${API_BASE}/v1/courses/${COURSE_SLUG}/assignments?week=${weekNo}" ""
     if [[ "$HTTP_CODE" != "200" ]]; then
       echo "failed to load existing assignment (week=${weekNo}, seq=${seqInWeek}): HTTP $HTTP_CODE" >&2
       echo "$HTTP_BODY" >&2
