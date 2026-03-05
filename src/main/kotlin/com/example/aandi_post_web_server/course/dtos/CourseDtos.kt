@@ -7,60 +7,152 @@ import com.example.aandi_post_web_server.course.enum.EnrollmentStatus
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 import java.time.Instant
 import java.time.LocalDate
+
+@Schema(description = "코스 메타데이터")
+data class CourseMetadataPayload(
+    @field:NotBlank
+    @field:Schema(description = "코스 이름", example = "FL 기초")
+    val title: String,
+    @field:Schema(description = "코스 설명", example = "프론트엔드 트랙 기초 과정")
+    val description: String? = null,
+    @field:Schema(description = "과정 단계", example = "BASIC")
+    val phase: CoursePhase? = null,
+    @field:Schema(description = "확장 메타데이터")
+    val attributes: Map<String, Any?> = emptyMap(),
+)
 
 @Schema(description = "코스 생성 요청")
 data class CreateCourseRequest(
     @field:NotBlank
-    @field:Schema(description = "코스 이름", example = "FL 기초")
-    val title: String,
-    @field:NotBlank
     @field:Schema(description = "코스 슬러그(고유값)", example = "fl-basic")
     val slug: String,
-    @field:Schema(description = "코스 설명", example = "프론트엔드 트랙 기초 과정")
-    val description: String? = null,
-    @field:Schema(description = "과정 단계", example = "BASIC")
-    val phase: CoursePhase,
-    @field:Schema(description = "대상 트랙", example = "FL")
-    val targetTrack: CourseTrack,
-)
+    @field:NotNull
+    @field:Schema(description = "분야 태그", example = "FL")
+    val fieldTag: CourseTrack,
+    @field:NotNull
+    @field:Schema(description = "과정 시작일", example = "2026-03-02")
+    val startDate: LocalDate,
+    @field:NotNull
+    @field:Schema(description = "과정 종료일", example = "2026-03-30")
+    val endDate: LocalDate,
+    @field:NotNull
+    @field:Schema(description = "코스 메타데이터")
+    val metadata: CourseMetadataPayload,
+) {
+    constructor(
+        title: String,
+        slug: String,
+        description: String? = null,
+        phase: CoursePhase,
+        targetTrack: CourseTrack,
+        startDate: LocalDate = LocalDate.now(),
+        endDate: LocalDate = LocalDate.now().plusDays(28),
+    ) : this(
+        slug = slug,
+        fieldTag = targetTrack,
+        startDate = startDate,
+        endDate = endDate,
+        metadata = CourseMetadataPayload(
+            title = title,
+            description = description,
+            phase = phase,
+        ),
+    )
+}
 
 @Schema(description = "코스 수정 요청")
 data class UpdateCourseRequest(
-    @field:Schema(description = "코스 이름", example = "FL 기초 - 개정")
-    val title: String? = null,
-    @field:Schema(description = "코스 설명", example = "설명 수정")
-    val description: String? = null,
-    @field:Schema(description = "과정 단계", example = "CS")
-    val phase: CoursePhase? = null,
-    @field:Schema(description = "대상 트랙", example = "SP")
-    val targetTrack: CourseTrack? = null,
+    @field:Schema(description = "분야 태그", example = "SP")
+    val fieldTag: CourseTrack? = null,
+    @field:Schema(description = "과정 시작일", example = "2026-03-02")
+    val startDate: LocalDate? = null,
+    @field:Schema(description = "과정 종료일", example = "2026-03-30")
+    val endDate: LocalDate? = null,
+    @field:Schema(description = "코스 메타데이터")
+    val metadata: CourseMetadataPayload? = null,
     @field:Schema(description = "코스 상태", example = "ACTIVE")
     val status: CourseStatus? = null,
+)
+
+@Schema(description = "코스 메타데이터 응답")
+data class CourseMetadataResponse(
+    @field:Schema(description = "코스 이름", example = "FL 기초")
+    val title: String,
+    @field:Schema(description = "코스 설명", example = "프론트엔드 트랙 기초 과정")
+    val description: String? = null,
+    @field:Schema(description = "과정 단계", example = "BASIC")
+    val phase: CoursePhase? = null,
+    @field:Schema(description = "확장 메타데이터")
+    val attributes: Map<String, Any?> = emptyMap(),
 )
 
 @Schema(description = "코스 응답")
 data class CourseResponse(
     @field:Schema(description = "코스 ID", example = "course-1")
     val id: String,
-    @field:Schema(description = "코스 이름", example = "FL 기초")
-    val title: String,
     @field:Schema(description = "코스 슬러그", example = "fl-basic")
     val slug: String,
-    @field:Schema(description = "코스 설명")
-    val description: String?,
-    @field:Schema(description = "과정 단계", example = "BASIC")
-    val phase: CoursePhase,
-    @field:Schema(description = "대상 트랙", example = "FL")
-    val targetTrack: CourseTrack,
+    @field:Schema(description = "분야 태그", example = "FL")
+    val fieldTag: CourseTrack,
+    @field:Schema(description = "과정 시작일", example = "2026-03-02")
+    val startDate: LocalDate,
+    @field:Schema(description = "과정 종료일", example = "2026-03-30")
+    val endDate: LocalDate,
+    @field:Schema(description = "코스 메타데이터")
+    val metadata: CourseMetadataResponse,
     @field:Schema(description = "코스 상태", example = "ACTIVE")
     val status: CourseStatus,
     @field:Schema(description = "생성 시각(UTC)", example = "2026-03-01T00:00:00Z")
     val createdAt: Instant,
     @field:Schema(description = "수정 시각(UTC)", example = "2026-03-01T00:00:00Z")
     val updatedAt: Instant,
-)
+) {
+    constructor(
+        id: String,
+        title: String,
+        slug: String,
+        description: String?,
+        phase: CoursePhase?,
+        targetTrack: CourseTrack,
+        status: CourseStatus,
+        createdAt: Instant,
+        updatedAt: Instant,
+    ) : this(
+        id = id,
+        slug = slug,
+        fieldTag = targetTrack,
+        startDate = LocalDate.of(1970, 1, 1),
+        endDate = LocalDate.of(2099, 12, 31),
+        metadata = CourseMetadataResponse(
+            title = title,
+            description = description,
+            phase = phase,
+            attributes = emptyMap(),
+        ),
+        status = status,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+    )
+
+    @get:Schema(description = "코스 이름(레거시 필드)", example = "FL 기초")
+    val title: String
+        get() = metadata.title
+
+    @get:Schema(description = "코스 설명(레거시 필드)")
+    val description: String?
+        get() = metadata.description
+
+    @get:Schema(description = "과정 단계(레거시 필드)", example = "BASIC")
+    val phase: CoursePhase?
+        get() = metadata.phase
+
+    @get:Schema(description = "대상 트랙(레거시 필드)", example = "FL")
+    val targetTrack: CourseTrack
+        get() = fieldTag
+}
 
 @Schema(description = "수강생 등록 요청")
 data class EnrollCourseRequest(

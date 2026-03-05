@@ -3,12 +3,13 @@ package com.example.aandi_post_web_server.course.controller
 import com.example.aandi_post_web_server.assignment.dtos.AssignmentDeliveryResponse
 import com.example.aandi_post_web_server.assignment.dtos.AssignmentDetailResponse
 import com.example.aandi_post_web_server.assignment.dtos.CreateAssignmentRequest
-import com.example.aandi_post_web_server.assignment.dtos.LegacyAssignmentLevel
+import com.example.aandi_post_web_server.assignment.dtos.AssignmentMetadataPayload
 import com.example.aandi_post_web_server.assignment.enum.AssignmentDeliveryStatus
 import com.example.aandi_post_web_server.assignment.enum.AssignmentDifficulty
 import com.example.aandi_post_web_server.assignment.enum.AssignmentStatus
 import com.example.aandi_post_web_server.common.security.SecurityConfig
 import com.example.aandi_post_web_server.course.dtos.CreateCourseRequest
+import com.example.aandi_post_web_server.course.dtos.CourseMetadataPayload
 import com.example.aandi_post_web_server.course.dtos.CourseResponse
 import com.example.aandi_post_web_server.course.enum.CoursePhase
 import com.example.aandi_post_web_server.course.enum.CourseStatus
@@ -28,6 +29,7 @@ import org.springframework.test.web.reactive.server.WebTestClient
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import java.time.Instant
+import java.time.LocalDate
 
 @WebFluxTest(controllers = [CourseV1Controller::class, CourseQueryV1Controller::class])
 @Import(SecurityConfig::class)
@@ -173,16 +175,21 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
 
         "admin API는 ADMIN 헤더로 호출하면 성공한다" {
             val response = sampleCourseResponse()
+            val startDate = LocalDate.parse("2026-03-01")
+            val endDate = LocalDate.parse("2026-03-28")
+            val request = CreateCourseRequest(
+                slug = "back-basic",
+                fieldTag = CourseTrack.FL,
+                startDate = startDate,
+                endDate = endDate,
+                metadata = CourseMetadataPayload(
+                    title = "BACK 기초",
+                    description = "desc",
+                    phase = CoursePhase.BASIC,
+                ),
+            )
             Mockito.`when`(
-                courseV1Service.createCourse(
-                    CreateCourseRequest(
-                        title = "BACK 기초",
-                        slug = "back-basic",
-                        description = "desc",
-                        phase = CoursePhase.BASIC,
-                        targetTrack = CourseTrack.FL,
-                    )
-                )
+                courseV1Service.createCourse(request)
             ).thenReturn(Mono.just(response))
 
             webTestClient.mutateWith(
@@ -193,11 +200,15 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                 .uri("/v1/admin/courses")
                 .bodyValue(
                     mapOf(
-                        "title" to "BACK 기초",
                         "slug" to "back-basic",
-                        "description" to "desc",
-                        "phase" to "BASIC",
-                        "targetTrack" to "FL",
+                        "fieldTag" to "FL",
+                        "startDate" to startDate.toString(),
+                        "endDate" to endDate.toString(),
+                        "metadata" to mapOf(
+                            "title" to "BACK 기초",
+                            "description" to "desc",
+                            "phase" to "BASIC",
+                        ),
                     )
                 )
                 .exchange()
@@ -209,18 +220,18 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
         "과제 생성은 JWT subject를 createdBy로 전달한다" {
             val response = sampleAssignmentDetailResponse()
             val request = CreateAssignmentRequest(
-                week = 1,
-                seq = 1,
-                title = "터미널 계산기",
-                content = "문제 본문",
-                requirement = emptyList(),
-                objects = emptyList(),
-                exampleIO = emptyList(),
-                reportType = "CS",
+                weekNo = 1,
+                orderInWeek = 1,
                 startAt = Instant.parse("2026-03-01T00:00:00Z"),
                 endAt = Instant.parse("2026-03-02T00:00:00Z"),
-                level = LegacyAssignmentLevel.MEDIUM,
-                timeLimitMinutes = 60,
+                metadata = AssignmentMetadataPayload(
+                    title = "터미널 계산기",
+                    difficulty = AssignmentDifficulty.MID,
+                    description = "문제 본문",
+                    timeLimitMinutes = 60,
+                ),
+                requirement = emptyList(),
+                exampleIO = emptyList(),
             )
             Mockito.`when`(
                 courseV1Service.createAssignment(
@@ -238,18 +249,18 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                 .uri("/v1/admin/courses/back-basic/assignments")
                 .bodyValue(
                     mapOf(
-                        "week" to 1,
-                        "seq" to 1,
-                        "title" to "터미널 계산기",
-                        "content" to "문제 본문",
-                        "requirement" to emptyList<Map<String, Any>>(),
-                        "objects" to emptyList<Map<String, Any>>(),
-                        "exampleIO" to emptyList<Map<String, Any>>(),
-                        "reportType" to "CS",
+                        "weekNo" to 1,
+                        "orderInWeek" to 1,
                         "startAt" to "2026-03-01T00:00:00Z",
                         "endAt" to "2026-03-02T00:00:00Z",
-                        "level" to "MEDIUM",
-                        "timeLimitMinutes" to 60,
+                        "metadata" to mapOf(
+                            "title" to "터미널 계산기",
+                            "difficulty" to "MID",
+                            "description" to "문제 본문",
+                            "timeLimitMinutes" to 60,
+                        ),
+                        "requirement" to emptyList<Map<String, Any>>(),
+                        "exampleIO" to emptyList<Map<String, Any>>(),
                     ),
                 )
                 .exchange()

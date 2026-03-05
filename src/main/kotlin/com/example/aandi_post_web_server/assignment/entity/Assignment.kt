@@ -7,8 +7,17 @@ import org.springframework.data.mongodb.core.index.CompoundIndex
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.Instant
 
+data class AssignmentMetadata(
+    val title: String,
+    val difficulty: AssignmentDifficulty,
+    val description: String,
+    val timeLimitMinutes: Int,
+    val learningGoals: List<String> = emptyList(),
+    val attributes: Map<String, Any?> = emptyMap(),
+)
+
 @Document(collection = "assignments")
-@CompoundIndex(name = "ux_assignment_course_week_seq", def = "{'courseId': 1, 'weekNo': 1, 'seqInWeek': 1}", unique = true)
+@CompoundIndex(name = "ux_assignment_course_week_order", def = "{'courseId': 1, 'weekNo': 1, 'orderInWeek': 1}", unique = true)
 data class Assignment(
     @Id
     val id: String? = null,
@@ -16,15 +25,52 @@ data class Assignment(
     val courseSlug: String = "",
     val createdBy: String,
     val weekNo: Int,
-    val seqInWeek: Int,
-    val title: String,
-    val difficulty: AssignmentDifficulty,
-    val contentMd: String,
-    val timeLimitMinutes: Int,
-    val openAt: Instant,
-    val dueAt: Instant,
+    val orderInWeek: Int,
+    val startAt: Instant,
+    val endAt: Instant,
+    val metadata: AssignmentMetadata,
     val status: AssignmentStatus = AssignmentStatus.DRAFT,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
     val publishedAt: Instant? = null,
-)
+) {
+    constructor(
+        id: String? = null,
+        courseId: String,
+        courseSlug: String = "",
+        createdBy: String,
+        weekNo: Int,
+        seqInWeek: Int,
+        title: String,
+        difficulty: AssignmentDifficulty,
+        contentMd: String,
+        timeLimitMinutes: Int,
+        openAt: Instant,
+        dueAt: Instant,
+        status: AssignmentStatus = AssignmentStatus.DRAFT,
+        createdAt: Instant = Instant.now(),
+        updatedAt: Instant = Instant.now(),
+        publishedAt: Instant? = null,
+    ) : this(
+        id = id,
+        courseId = courseId,
+        courseSlug = courseSlug,
+        createdBy = createdBy,
+        weekNo = weekNo,
+        orderInWeek = seqInWeek,
+        startAt = openAt,
+        endAt = dueAt,
+        metadata = AssignmentMetadata(
+            title = title,
+            difficulty = difficulty,
+            description = contentMd,
+            timeLimitMinutes = timeLimitMinutes,
+            learningGoals = emptyList(),
+            attributes = emptyMap(),
+        ),
+        status = status,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        publishedAt = publishedAt,
+    )
+}
