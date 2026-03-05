@@ -9,7 +9,9 @@ import com.example.aandi_post_web_server.assignment.repository.AssignmentReposit
 import com.example.aandi_post_web_server.assignment.repository.AssignmentRequirementRepository
 import com.example.aandi_post_web_server.course.dtos.CreateCourseWeekRequest
 import com.example.aandi_post_web_server.course.entity.Course
+import com.example.aandi_post_web_server.course.entity.CourseEnrollment
 import com.example.aandi_post_web_server.course.entity.CourseWeek
+import com.example.aandi_post_web_server.course.enum.EnrollmentStatus
 import com.example.aandi_post_web_server.course.repository.CourseEnrollmentRepository
 import com.example.aandi_post_web_server.course.repository.CourseRepository
 import com.example.aandi_post_web_server.course.repository.CourseWeekRepository
@@ -24,12 +26,21 @@ import java.time.Instant
 import java.time.LocalDate
 
 class CourseV1ServiceTest : StringSpec({
-    "모든 사용자는 코스 과제를 조회할 수 있다" {
+    "ENROLLED 사용자는 코스 과제를 조회할 수 있다" {
         val fixture = Fixture()
+        val userId = "8ee88b63-526d-49dc-9e72-a96be0f81385"
         val course = Course(id = "course-1", title = "BACK 기초", slug = "back-basic")
+        val enrollment = CourseEnrollment(
+            id = "enroll-1",
+            courseId = "course-1",
+            userId = userId,
+            status = EnrollmentStatus.ENROLLED,
+        )
         val visibleAssignment = assignment(id = "a-1", courseId = "course-1", weekNo = 1, status = AssignmentStatus.PUBLISHED)
 
         Mockito.`when`(fixture.courseRepository.findBySlug("back-basic")).thenReturn(Mono.just(course))
+        Mockito.`when`(fixture.courseEnrollmentRepository.findByCourseIdAndUserId("course-1", userId))
+            .thenReturn(Mono.just(enrollment))
         Mockito.`when`(fixture.assignmentRepository.findAllByCourseIdAndStatus("course-1", AssignmentStatus.PUBLISHED))
             .thenReturn(Flux.just(visibleAssignment))
 
@@ -38,6 +49,7 @@ class CourseV1ServiceTest : StringSpec({
                 courseSlug = "back-basic",
                 weekNo = null,
                 status = AssignmentStatus.PUBLISHED,
+                userId = userId,
             )
         )
             .assertNext {
@@ -47,12 +59,21 @@ class CourseV1ServiceTest : StringSpec({
             .verifyComplete()
     }
 
-    "delivery 정보가 없어도 과제 상세를 조회할 수 있다" {
+    "ENROLLED 사용자는 delivery 정보가 없어도 과제 상세를 조회할 수 있다" {
         val fixture = Fixture()
+        val userId = "8ee88b63-526d-49dc-9e72-a96be0f81385"
         val course = Course(id = "course-1", title = "BACK 기초", slug = "back-basic")
+        val enrollment = CourseEnrollment(
+            id = "enroll-1",
+            courseId = "course-1",
+            userId = userId,
+            status = EnrollmentStatus.ENROLLED,
+        )
         val assignment = assignment(id = "a-1", courseId = "course-1", weekNo = 1, status = AssignmentStatus.PUBLISHED)
 
         Mockito.`when`(fixture.courseRepository.findBySlug("back-basic")).thenReturn(Mono.just(course))
+        Mockito.`when`(fixture.courseEnrollmentRepository.findByCourseIdAndUserId("course-1", userId))
+            .thenReturn(Mono.just(enrollment))
         Mockito.`when`(fixture.assignmentRepository.findByIdAndCourseId("a-1", "course-1")).thenReturn(Mono.just(assignment))
         Mockito.`when`(fixture.assignmentRequirementRepository.findAllByAssignmentIdOrderBySortOrder("a-1"))
             .thenReturn(Flux.empty())
@@ -63,6 +84,7 @@ class CourseV1ServiceTest : StringSpec({
             fixture.service.getAssignmentDetail(
                 courseSlug = "back-basic",
                 assignmentId = "a-1",
+                userId = userId,
             )
         )
             .assertNext {

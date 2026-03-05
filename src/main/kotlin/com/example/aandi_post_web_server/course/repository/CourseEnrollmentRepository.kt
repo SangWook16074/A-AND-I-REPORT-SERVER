@@ -10,4 +10,5 @@ interface CourseEnrollmentRepository : ReactiveMongoRepository<CourseEnrollment,
     fun findByCourseIdAndUserId(courseId: String, userId: String): Mono<CourseEnrollment>
     fun findAllByCourseId(courseId: String): Flux<CourseEnrollment>
     fun findAllByCourseIdAndStatus(courseId: String, status: EnrollmentStatus): Flux<CourseEnrollment>
+    fun findAllByUserIdAndStatus(userId: String, status: EnrollmentStatus): Flux<CourseEnrollment>
 }

@@ -46,11 +46,23 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
             Mockito.reset(courseV1Service)
         }
 
-        "public 조회 API는 권한 헤더 없이 호출 가능하다" {
-            val response = sampleCourseResponse()
-            Mockito.`when`(courseV1Service.getCourses(null, null, null)).thenReturn(Flux.just(response))
-
+        "코스 조회 API는 토큰이 없으면 401을 반환한다" {
             webTestClient.get()
+                .uri("/v1/courses")
+                .exchange()
+                .expectStatus().isUnauthorized
+        }
+
+        "코스 조회 API는 USER 토큰으로 호출하면 성공한다" {
+            val response = sampleCourseResponse()
+            val userId = "8ee88b63-526d-49dc-9e72-a96be0f81385"
+            Mockito.`when`(courseV1Service.getCourses(null, null, null, userId)).thenReturn(Flux.just(response))
+
+            webTestClient.mutateWith(
+                mockJwt().jwt { jwt ->
+                    jwt.subject(userId)
+                }.authorities(SimpleGrantedAuthority("ROLE_USER")),
+            ).get()
                 .uri("/v1/courses")
                 .exchange()
                 .expectStatus().isOk
@@ -58,12 +70,24 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                 .jsonPath("$[0].slug").isEqualTo("back-basic")
         }
 
-        "public 과제 상세 조회 API는 권한 헤더 없이 호출 가능하다" {
+        "과제 상세 조회 API는 토큰이 없으면 401을 반환한다" {
+            webTestClient.get()
+                .uri("/v1/courses/back-basic/assignments/assignment-1")
+                .exchange()
+                .expectStatus().isUnauthorized
+        }
+
+        "과제 상세 조회 API는 USER 토큰으로 호출하면 성공한다" {
             val response = sampleAssignmentDetailResponse()
-            Mockito.`when`(courseV1Service.getAssignmentDetail("back-basic", "assignment-1"))
+            val userId = "8ee88b63-526d-49dc-9e72-a96be0f81385"
+            Mockito.`when`(courseV1Service.getAssignmentDetail("back-basic", "assignment-1", userId))
                 .thenReturn(Mono.just(response))
 
-            webTestClient.get()
+            webTestClient.mutateWith(
+                mockJwt().jwt { jwt ->
+                    jwt.subject(userId)
+                }.authorities(SimpleGrantedAuthority("ROLE_USER")),
+            ).get()
                 .uri("/v1/courses/back-basic/assignments/assignment-1")
                 .exchange()
                 .expectStatus().isOk
@@ -71,12 +95,17 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                 .jsonPath("$.id").isEqualTo("assignment-1")
         }
 
-        "과제 ID로 코스 조회 API는 권한 헤더 없이 호출 가능하다" {
+        "과제 ID로 코스 조회 API는 USER 토큰으로 호출하면 성공한다" {
             val response = sampleCourseResponse()
-            Mockito.`when`(courseV1Service.getAssignmentCourse("assignment-1"))
+            val userId = "8ee88b63-526d-49dc-9e72-a96be0f81385"
+            Mockito.`when`(courseV1Service.getAssignmentCourse("assignment-1", userId))
                 .thenReturn(Mono.just(response))
 
-            webTestClient.get()
+            webTestClient.mutateWith(
+                mockJwt().jwt { jwt ->
+                    jwt.subject(userId)
+                }.authorities(SimpleGrantedAuthority("ROLE_USER")),
+            ).get()
                 .uri("/v1/courses/assignments/assignment-1/course")
                 .exchange()
                 .expectStatus().isOk
@@ -86,15 +115,21 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
 
         "코스 조회 API는 track 쿼리 파라미터로 필터링 호출한다" {
             val response = sampleCourseResponse()
+            val userId = "8ee88b63-526d-49dc-9e72-a96be0f81385"
             Mockito.`when`(
                 courseV1Service.getCourses(
                     status = null,
                     phase = null,
                     track = UserTrack.FL,
+                    userId = userId,
                 )
             ).thenReturn(Flux.just(response))
 
-            webTestClient.get()
+            webTestClient.mutateWith(
+                mockJwt().jwt { jwt ->
+                    jwt.subject(userId)
+                }.authorities(SimpleGrantedAuthority("ROLE_USER")),
+            ).get()
                 .uri("/v1/courses?track=FL")
                 .exchange()
                 .expectStatus().isOk
