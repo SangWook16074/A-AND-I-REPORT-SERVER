@@ -48,7 +48,7 @@ class SecurityConfig {
                 ).permitAll()
                 it.pathMatchers("/v1/admin/**").hasRole("ADMIN")
                 it.pathMatchers("/v1/report/**", "/v1/courses/**").hasAnyRole("USER", "ORGANIZER", "ADMIN")
-                it.anyExchange().permitAll()
+                it.anyExchange().denyAll()
             }
             .exceptionHandling { exceptions ->
                 exceptions.authenticationEntryPoint { exchange, _ ->
