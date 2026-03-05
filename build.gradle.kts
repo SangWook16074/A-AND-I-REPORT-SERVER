@@ -3,6 +3,7 @@ plugins {
 	kotlin("plugin.spring") version "1.9.25"
 	id("org.springframework.boot") version "3.4.3"
 	id("io.spring.dependency-management") version "1.1.6"
+	id("jacoco")
 }
 
 group = "com.example"
@@ -49,4 +50,63 @@ kotlin {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+	finalizedBy(tasks.jacocoTestReport)
+}
+
+jacoco {
+	toolVersion = "0.8.12"
+}
+
+val coverageExcludes = listOf(
+	"**/Application*",
+	"**/*$*",
+	"**/entity/**",
+	"**/enum/**",
+	"**/repository/**",
+	"**/dtos/**",
+	"**/common/openapi/**",
+	"**/common/annotation/**",
+	"**/common/config/SwaggerConfig*",
+	"**/common/config/WebConfig*",
+	"**/course/controller/**",
+	"**/course/service/CourseCommandService*",
+	"**/course/service/CourseV1Service*",
+)
+
+val kotlinMainClasses = layout.buildDirectory.dir("classes/kotlin/main")
+
+tasks.jacocoTestReport {
+	dependsOn(tasks.test)
+	reports {
+		xml.required.set(true)
+		html.required.set(true)
+		csv.required.set(false)
+	}
+	classDirectories.setFrom(
+		kotlinMainClasses.map { classesDir ->
+			fileTree(classesDir) {
+				exclude(coverageExcludes)
+			}
+		},
+	)
+}
+
+tasks.jacocoTestCoverageVerification {
+	dependsOn(tasks.test)
+	classDirectories.setFrom(
+		kotlinMainClasses.map { classesDir ->
+			fileTree(classesDir) {
+				exclude(coverageExcludes)
+			}
+		},
+	)
+	violationRules {
+		rule {
+			limit {
+				counter = "LINE"
+				value = "COVEREDRATIO"
+				minimum = "0.70".toBigDecimal()
+			}
+		}
+	}
 }
