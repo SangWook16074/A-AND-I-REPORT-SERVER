@@ -21,6 +21,9 @@ jobs:
       APP_DIR: ${{ vars.APP_DIR || '/opt/aandi-report-server' }}
       MONGO_DB_NAME: ${{ vars.MONGO_DB_NAME || 'aandi' }}
       SWAGGER_URL: ${{ vars.SWAGGER_URL || 'http://localhost:8080' }}
+      AUTH_ISSUER_URI: ${{ vars.AUTH_ISSUER_URI || 'https://auth.aandiclub.com' }}
+      AUTH_AUDIENCE: ${{ vars.AUTH_AUDIENCE || 'aandiclub-api' }}
+      AUTH_JWT_CLOCK_SKEW_SECONDS: ${{ vars.AUTH_JWT_CLOCK_SKEW_SECONDS || '30' }}
 
     steps:
       - name: Checkout
@@ -73,20 +76,46 @@ jobs:
           APP_DIR: ${{ env.APP_DIR }}
           MONGO_DB_NAME: ${{ env.MONGO_DB_NAME }}
           SWAGGER_URL: ${{ env.SWAGGER_URL }}
+          AUTH_ISSUER_URI: ${{ env.AUTH_ISSUER_URI }}
+          AUTH_AUDIENCE: ${{ env.AUTH_AUDIENCE }}
+          AUTH_JWT_CLOCK_SKEW_SECONDS: ${{ env.AUTH_JWT_CLOCK_SKEW_SECONDS }}
+          AUTH_JWT_SECRET: ${{ secrets.AUTH_JWT_SECRET }}
         with:
           host: ${{ secrets.AWS_HOST }}
           username: ${{ secrets.AWS_USER }}
           key: ${{ secrets.AWS_SSH_KEY }}
           port: ${{ vars.AWS_PORT || '22' }}
-          envs: AWS_REGION,IMAGE_URI,APP_DIR,MONGO_DB_NAME,SWAGGER_URL
+          envs: AWS_REGION,IMAGE_URI,APP_DIR,MONGO_DB_NAME,SWAGGER_URL,AUTH_ISSUER_URI,AUTH_AUDIENCE,AUTH_JWT_CLOCK_SKEW_SECONDS,AUTH_JWT_SECRET
           script: |
             set -euo pipefail
+
+            for v in AUTH_ISSUER_URI AUTH_AUDIENCE AUTH_JWT_SECRET; do
+              eval "val=\${$v:-}"
+              if [ -z "${val}" ]; then
+                echo "Missing required env: ${v}"
+                exit 1
+              fi
+            done
+            if [ "${#AUTH_JWT_SECRET}" -lt 32 ]; then
+              echo "AUTH_JWT_SECRET must be at least 32 chars"
+              exit 1
+            fi
 
             ECR_REGISTRY="$(echo "${IMAGE_URI}" | cut -d'/' -f1)"
 
             aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
 
             mkdir -p "${APP_DIR}"
+            cat > "${APP_DIR}/.env.runtime" <<EOF
+            IMAGE_URI=${IMAGE_URI}
+            MONGO_DB_NAME=${MONGO_DB_NAME}
+            SWAGGER_URL=${SWAGGER_URL}
+            AUTH_ISSUER_URI=${AUTH_ISSUER_URI}
+            AUTH_AUDIENCE=${AUTH_AUDIENCE}
+            AUTH_JWT_CLOCK_SKEW_SECONDS=${AUTH_JWT_CLOCK_SKEW_SECONDS}
+            AUTH_JWT_SECRET=${AUTH_JWT_SECRET}
+            EOF
+
             # Keep EOF single-quoted so ${...} remains for docker compose env interpolation time.
             cat <<'EOF' > "${APP_DIR}/docker-compose.yml"
             services:
@@ -115,20 +144,22 @@ jobs:
                   SPRING_PROFILES_ACTIVE: prod
                   MONGO_DB_URL: mongodb://mongodb:27017/${MONGO_DB_NAME}
                   SWAGGER_URL: ${SWAGGER_URL}
+                  AUTH_ISSUER_URI: ${AUTH_ISSUER_URI}
+                  AUTH_AUDIENCE: ${AUTH_AUDIENCE}
+                  AUTH_JWT_CLOCK_SKEW_SECONDS: ${AUTH_JWT_CLOCK_SKEW_SECONDS}
+                  AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
 
             volumes:
               mongo_data:
             EOF
 
             cd "${APP_DIR}"
-            IMAGE_URI="${IMAGE_URI}" \
-            MONGO_DB_NAME="${MONGO_DB_NAME}" \
-            SWAGGER_URL="${SWAGGER_URL}" \
-            docker compose pull
+            docker compose --env-file .env.runtime pull
+            docker compose --env-file .env.runtime up -d --remove-orphans
 
-            IMAGE_URI="${IMAGE_URI}" \
-            MONGO_DB_NAME="${MONGO_DB_NAME}" \
-            SWAGGER_URL="${SWAGGER_URL}" \
-            docker compose up -d --remove-orphans
+            docker exec aandi-report-server sh -lc \
+              'echo "AUTH_JWT_SECRET_LEN=$(echo -n "${AUTH_JWT_SECRET:-}" | wc -c)"; env | egrep "AUTH_ISSUER_URI|AUTH_AUDIENCE|AUTH_JWT_CLOCK_SKEW_SECONDS"'
+
+            rm -f "${APP_DIR}/.env.runtime"
 
             docker image prune -f --filter "until=72h"
