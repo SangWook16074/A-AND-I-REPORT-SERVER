@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
@@ -59,8 +60,9 @@ class CourseQueryV1Controller(
         @RequestParam(required = false) phase: CoursePhase?,
         @Parameter(description = "유저 트랙", example = "FL")
         @RequestParam(required = false) track: UserTrack?,
+        authentication: Authentication,
     ): Flux<CourseResponse> {
-        return courseV1Service.getCourses(status, phase, track)
+        return courseV1Service.getCourses(status, phase, track, authentication.name)
     }
 
     @Operation(summary = "코스 상세 조회", description = "courseSlug로 단일 코스를 조회합니다.")
@@ -74,8 +76,9 @@ class CourseQueryV1Controller(
     fun getCourse(
         @Parameter(description = "코스 슬러그", example = "back-basic")
         @PathVariable courseSlug: String,
+        authentication: Authentication,
     ): Mono<CourseResponse> {
-        return courseV1Service.getCourse(courseSlug)
+        return courseV1Service.getCourse(courseSlug, authentication.name)
     }
 
     @Operation(summary = "코스 주차 목록 조회", description = "해당 코스의 주차 목록을 조회합니다.")
@@ -93,8 +96,9 @@ class CourseQueryV1Controller(
     fun getWeeks(
         @Parameter(description = "코스 슬러그", example = "back-basic")
         @PathVariable courseSlug: String,
+        authentication: Authentication,
     ): Flux<CourseWeekResponse> {
-        return courseV1Service.getWeeks(courseSlug)
+        return courseV1Service.getWeeks(courseSlug, authentication.name)
     }
 
     @Operation(summary = "주차별 과제 목록 조회", description = "특정 주차의 과제 목록을 조회합니다.")
@@ -117,11 +121,13 @@ class CourseQueryV1Controller(
         @PathVariable weekNo: Int,
         @Parameter(description = "과제 상태", example = "PUBLISHED")
         @RequestParam(required = false) status: AssignmentStatus?,
+        authentication: Authentication,
     ): Flux<AssignmentSummaryResponse> {
         return courseV1Service.getAssignmentsByWeek(
             courseSlug = courseSlug,
             weekNo = weekNo,
             status = status,
+            userId = authentication.name,
         )
     }
 
@@ -147,12 +153,14 @@ class CourseQueryV1Controller(
         @RequestParam(name = "weekNo", required = false) weekNo: Int?,
         @Parameter(description = "과제 상태(옵션)", example = "PUBLISHED")
         @RequestParam(required = false) status: AssignmentStatus?,
+        authentication: Authentication,
     ): Flux<AssignmentSummaryResponse> {
         val resolvedWeek = week ?: weekNo
         return courseV1Service.getAssignments(
             courseSlug = courseSlug,
             weekNo = resolvedWeek,
             status = status,
+            userId = authentication.name,
         )
     }
 
@@ -169,10 +177,12 @@ class CourseQueryV1Controller(
         @PathVariable courseSlug: String,
         @Parameter(description = "과제 ID", example = "assignment-1")
         @PathVariable assignmentId: String,
+        authentication: Authentication,
     ): Mono<AssignmentDetailResponse> {
         return courseV1Service.getAssignmentDetail(
             courseSlug = courseSlug,
             assignmentId = assignmentId,
+            userId = authentication.name,
         )
     }
 
@@ -187,7 +197,8 @@ class CourseQueryV1Controller(
     fun getAssignmentCourse(
         @Parameter(description = "과제 ID", example = "assignment-1")
         @PathVariable assignmentId: String,
+        authentication: Authentication,
     ): Mono<CourseResponse> {
-        return courseV1Service.getAssignmentCourse(assignmentId)
+        return courseV1Service.getAssignmentCourse(assignmentId, authentication.name)
     }
 }

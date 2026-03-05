@@ -38,15 +38,16 @@ class CourseV1Service(
     fun archiveCourse(courseSlug: String): Mono<Void> =
         courseCommandService.archiveCourse(courseSlug)
 
-    fun getCourse(courseSlug: String): Mono<CourseResponse> =
-        courseQueryService.getCourse(courseSlug)
+    fun getCourse(courseSlug: String, userId: String): Mono<CourseResponse> =
+        courseQueryService.getCourse(courseSlug, userId)
 
     fun getCourses(
         status: CourseStatus?,
         phase: CoursePhase?,
         track: UserTrack?,
+        userId: String,
     ): Flux<CourseResponse> =
-        courseQueryService.getCourses(status, phase, track)
+        courseQueryService.getCourses(status, phase, track, userId)
 
     fun enrollMember(courseSlug: String, request: EnrollCourseRequest): Mono<CourseEnrollmentResponse> =
         courseCommandService.enrollMember(courseSlug, request)
@@ -64,8 +65,8 @@ class CourseV1Service(
     fun createWeek(courseSlug: String, request: CreateCourseWeekRequest): Mono<CourseWeekResponse> =
         courseCommandService.createWeek(courseSlug, request)
 
-    fun getWeeks(courseSlug: String): Flux<CourseWeekResponse> =
-        courseQueryService.getWeeks(courseSlug)
+    fun getWeeks(courseSlug: String, userId: String): Flux<CourseWeekResponse> =
+        courseQueryService.getWeeks(courseSlug, userId)
 
     fun createAssignment(
         courseSlug: String,
@@ -81,24 +82,27 @@ class CourseV1Service(
         courseSlug: String,
         weekNo: Int,
         status: AssignmentStatus?,
+        userId: String,
     ): Flux<AssignmentSummaryResponse> =
-        courseQueryService.getAssignmentsByWeek(courseSlug, weekNo, status)
+        courseQueryService.getAssignmentsByWeek(courseSlug, weekNo, status, userId)
 
     fun getAssignments(
         courseSlug: String,
         weekNo: Int?,
         status: AssignmentStatus?,
+        userId: String,
     ): Flux<AssignmentSummaryResponse> =
-        courseQueryService.getAssignments(courseSlug, weekNo, status)
+        courseQueryService.getAssignments(courseSlug, weekNo, status, userId)
 
     fun getAssignmentDetail(
         courseSlug: String,
         assignmentId: String,
+        userId: String,
     ): Mono<AssignmentDetailResponse> =
-        courseQueryService.getAssignmentDetail(courseSlug, assignmentId)
+        courseQueryService.getAssignmentDetail(courseSlug, assignmentId, userId)
 
-    fun getAssignmentCourse(assignmentId: String): Mono<CourseResponse> =
-        courseQueryService.getAssignmentCourse(assignmentId)
+    fun getAssignmentCourse(assignmentId: String, userId: String): Mono<CourseResponse> =
+        courseQueryService.getAssignmentCourse(assignmentId, userId)
 
     fun triggerDeliveries(courseSlug: String, assignmentId: String): Mono<TriggerDeliveriesResponse> =
         courseCommandService.triggerDeliveries(courseSlug, assignmentId)

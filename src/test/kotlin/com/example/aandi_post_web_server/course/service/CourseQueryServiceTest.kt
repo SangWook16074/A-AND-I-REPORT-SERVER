@@ -10,7 +10,9 @@ import com.example.aandi_post_web_server.assignment.repository.AssignmentExample
 import com.example.aandi_post_web_server.assignment.repository.AssignmentRepository
 import com.example.aandi_post_web_server.assignment.repository.AssignmentRequirementRepository
 import com.example.aandi_post_web_server.course.entity.Course
+import com.example.aandi_post_web_server.course.entity.CourseEnrollment
 import com.example.aandi_post_web_server.course.enum.CourseTrack
+import com.example.aandi_post_web_server.course.enum.EnrollmentStatus
 import com.example.aandi_post_web_server.course.enum.UserTrack
 import com.example.aandi_post_web_server.course.repository.CourseEnrollmentRepository
 import com.example.aandi_post_web_server.course.repository.CourseRepository
@@ -18,25 +20,41 @@ import com.example.aandi_post_web_server.course.repository.CourseWeekRepository
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.kotest.assertions.throwables.shouldThrow
 import org.mockito.Mockito
+import org.springframework.http.HttpStatus
+import org.springframework.web.server.ResponseStatusException
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.test.StepVerifier
 import java.time.Instant
 
 class CourseQueryServiceTest : StringSpec({
-    "코스 조회는 track=FL이면 FL 코스만 반환한다" {
+    "코스 조회는 ENROLLED + track=FL 필터를 함께 적용한다" {
         val fixture = QueryFixture()
+        val userId = "8ee88b63-526d-49dc-9e72-a96be0f81385"
         val flCourse = Course(id = "course-1", title = "FL 기초", slug = "fl-basic", targetTrack = CourseTrack.FL)
         val spCourse = Course(id = "course-2", title = "SP 기초", slug = "sp-basic", targetTrack = CourseTrack.SP)
+        val enrollments = listOf(
+            CourseEnrollment(id = "enroll-1", courseId = "course-1", userId = userId, status = EnrollmentStatus.ENROLLED),
+            CourseEnrollment(id = "enroll-2", courseId = "course-2", userId = userId, status = EnrollmentStatus.ENROLLED),
+        )
 
-        Mockito.`when`(fixture.courseRepository.findAll()).thenReturn(Flux.just(flCourse, spCourse))
+        Mockito.`when`(
+            fixture.courseEnrollmentRepository.findAllByUserIdAndStatus(
+                userId,
+                EnrollmentStatus.ENROLLED,
+            )
+        ).thenReturn(Flux.fromIterable(enrollments))
+        Mockito.`when`(fixture.courseRepository.findAllById(listOf("course-1", "course-2")))
+            .thenReturn(Flux.just(flCourse, spCourse))
 
         StepVerifier.create(
             fixture.service.getCourses(
                 status = null,
                 phase = null,
                 track = UserTrack.FL,
+                userId = userId,
             ).map { it.slug }.collectList()
         )
             .assertNext { slugs ->
@@ -47,18 +65,68 @@ class CourseQueryServiceTest : StringSpec({
 
     "코스 조회는 track=NO이면 빈 목록을 반환한다" {
         val fixture = QueryFixture()
+        val userId = "8ee88b63-526d-49dc-9e72-a96be0f81385"
 
         StepVerifier.create(
             fixture.service.getCourses(
                 status = null,
                 phase = null,
                 track = UserTrack.NO,
+                userId = userId,
             ).collectList()
         )
             .assertNext { courses ->
                 courses.size shouldBe 0
             }
             .verifyComplete()
+    }
+
+    "과제 조회는 status 미지정 시 PUBLISHED만 조회한다" {
+        val fixture = QueryFixture()
+        val userId = "8ee88b63-526d-49dc-9e72-a96be0f81385"
+        val course = Course(id = "course-1", title = "BACK 기초", slug = "back-basic")
+        val enrollment = CourseEnrollment(
+            id = "enroll-1",
+            courseId = "course-1",
+            userId = userId,
+            status = EnrollmentStatus.ENROLLED,
+        )
+        val published = queryAssignment(id = "assignment-1", courseId = "course-1")
+
+        Mockito.`when`(fixture.courseRepository.findBySlug("back-basic")).thenReturn(Mono.just(course))
+        Mockito.`when`(fixture.courseEnrollmentRepository.findByCourseIdAndUserId("course-1", userId))
+            .thenReturn(Mono.just(enrollment))
+        Mockito.`when`(fixture.assignmentRepository.findAllByCourseIdAndStatus("course-1", AssignmentStatus.PUBLISHED))
+            .thenReturn(Flux.just(published))
+
+        StepVerifier.create(
+            fixture.service.getAssignments(
+                courseSlug = "back-basic",
+                weekNo = null,
+                status = null,
+                userId = userId,
+            ).map { it.id }.collectList()
+        )
+            .assertNext { ids ->
+                ids.shouldContainExactly("assignment-1")
+            }
+            .verifyComplete()
+    }
+
+    "과제 조회에서 DRAFT 상태 요청은 BAD_REQUEST를 반환한다" {
+        val fixture = QueryFixture()
+        val userId = "8ee88b63-526d-49dc-9e72-a96be0f81385"
+
+        val error = shouldThrow<ResponseStatusException> {
+            fixture.service.getAssignments(
+                courseSlug = "back-basic",
+                weekNo = null,
+                status = AssignmentStatus.DRAFT,
+                userId = userId,
+            )
+        }
+
+        error.statusCode shouldBe HttpStatus.BAD_REQUEST
     }
 
     "배포 조회는 deliveredAt 기준 내림차순 정렬된다" {
