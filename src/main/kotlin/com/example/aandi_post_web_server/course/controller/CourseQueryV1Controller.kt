@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
@@ -28,6 +29,7 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 
 @Tag(name = "코스 조회 API", description = "트랙/과정/코스/과제 조회 API")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/v1/courses")
 class CourseQueryV1Controller(
