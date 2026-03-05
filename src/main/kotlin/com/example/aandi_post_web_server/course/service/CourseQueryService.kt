@@ -123,7 +123,7 @@ class CourseQueryService(
                 val courseId = parseCourseId(requireNotNull(course.id))
                 findAssignmentsByFilter(courseId, parsedWeekNo, visibleStatus)
             }
-            .sort(compareBy<Assignment> { it.weekNo }.thenBy { it.seqInWeek })
+            .sort(compareBy<Assignment> { it.weekNo }.thenBy { it.orderInWeek })
             .map(::toAssignmentSummaryResponse)
     }
 
@@ -232,8 +232,8 @@ class CourseQueryService(
                 }
                 courseRepository.findAllById(enrolledCourseIds)
                     .filter { course -> status == null || course.status == status }
-                    .filter { course -> phase == null || course.phase == phase }
-                    .filter { course -> targetTrack == null || course.targetTrack == targetTrack }
+                    .filter { course -> phase == null || course.metadata.phase == phase }
+                    .filter { course -> targetTrack == null || course.fieldTag == targetTrack }
             }
     }
 
@@ -329,11 +329,16 @@ class CourseQueryService(
 
     private fun toCourseResponse(course: Course): CourseResponse = CourseResponse(
         id = requireNotNull(course.id),
-        title = course.title,
         slug = course.slug,
-        description = course.description,
-        phase = course.phase,
-        targetTrack = course.targetTrack,
+        fieldTag = course.fieldTag,
+        startDate = course.startDate,
+        endDate = course.endDate,
+        metadata = com.example.aandi_post_web_server.course.dtos.CourseMetadataResponse(
+            title = course.metadata.title,
+            description = course.metadata.description,
+            phase = course.metadata.phase,
+            attributes = course.metadata.attributes,
+        ),
         status = course.status,
         createdAt = course.createdAt,
         updatedAt = course.updatedAt,
@@ -363,12 +368,18 @@ class CourseQueryService(
     private fun toAssignmentSummaryResponse(assignment: Assignment): AssignmentSummaryResponse = AssignmentSummaryResponse(
         id = requireNotNull(assignment.id),
         weekNo = assignment.weekNo,
-        seqInWeek = assignment.seqInWeek,
-        title = assignment.title,
-        difficulty = assignment.difficulty,
-        openAt = assignment.openAt,
-        dueAt = assignment.dueAt,
+        orderInWeek = assignment.orderInWeek,
+        startAt = assignment.startAt,
+        endAt = assignment.endAt,
         status = assignment.status,
+        metadata = com.example.aandi_post_web_server.assignment.dtos.AssignmentMetadataResponse(
+            title = assignment.metadata.title,
+            difficulty = assignment.metadata.difficulty,
+            description = assignment.metadata.description,
+            timeLimitMinutes = assignment.metadata.timeLimitMinutes,
+            learningGoals = assignment.metadata.learningGoals,
+            attributes = assignment.metadata.attributes,
+        ),
     )
 
     private fun toAssignmentDetailResponse(
@@ -380,15 +391,19 @@ class CourseQueryService(
         id = requireNotNull(assignment.id),
         courseSlug = courseSlug,
         weekNo = assignment.weekNo,
-        seqInWeek = assignment.seqInWeek,
-        title = assignment.title,
-        difficulty = assignment.difficulty,
-        contentMd = assignment.contentMd,
-        timeLimitMinutes = assignment.timeLimitMinutes,
-        openAt = assignment.openAt,
-        dueAt = assignment.dueAt,
+        orderInWeek = assignment.orderInWeek,
+        startAt = assignment.startAt,
+        endAt = assignment.endAt,
         status = assignment.status,
         publishedAt = assignment.publishedAt,
+        metadata = com.example.aandi_post_web_server.assignment.dtos.AssignmentMetadataResponse(
+            title = assignment.metadata.title,
+            difficulty = assignment.metadata.difficulty,
+            description = assignment.metadata.description,
+            timeLimitMinutes = assignment.metadata.timeLimitMinutes,
+            learningGoals = assignment.metadata.learningGoals,
+            attributes = assignment.metadata.attributes,
+        ),
         requirements = requirements,
         examples = examples,
     )

@@ -10,6 +10,6 @@ data class ApiErrorResponse(
     val error: String,
     @field:Schema(description = "상세 메시지", example = "코스를 찾을 수 없습니다: back-basic")
     val message: String? = null,
-    @field:Schema(description = "요청 경로", example = "/v2/report/v1/courses/back-basic")
+    @field:Schema(description = "요청 경로", example = "/v1/courses/back-basic")
     val path: String? = null,
 )

@@ -47,7 +47,10 @@ class CourseV1Controller(
     private val courseV1Service: CourseV1Service,
 ) {
 
-    @Operation(summary = "코스 생성", description = "관리자가 코스를 생성합니다. phase와 targetTrack은 필수입니다.")
+    @Operation(
+        summary = "코스 생성",
+        description = "관리자가 코스를 생성합니다. 필수 코어 필드는 slug/fieldTag/startDate/endDate이며, 상세 정보는 metadata로 관리합니다.",
+    )
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "생성 성공", content = [Content(schema = Schema(implementation = CourseResponse::class))]),
@@ -60,7 +63,10 @@ class CourseV1Controller(
         @Valid @RequestBody request: CreateCourseRequest,
     ): Mono<CourseResponse> = courseV1Service.createCourse(request)
 
-    @Operation(summary = "코스 수정", description = "코스 제목/설명/상태/phase/targetTrack을 수정합니다.")
+    @Operation(
+        summary = "코스 수정",
+        description = "코스 코어 필드(fieldTag/startDate/endDate), metadata, status를 수정합니다.",
+    )
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "수정 성공", content = [Content(schema = Schema(implementation = CourseResponse::class))]),

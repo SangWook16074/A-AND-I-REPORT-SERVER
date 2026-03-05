@@ -35,6 +35,7 @@ import com.example.aandi_post_web_server.course.dtos.UpdateCourseRequest
 import com.example.aandi_post_web_server.course.dtos.UpdateEnrollmentRequest
 import com.example.aandi_post_web_server.course.entity.Course
 import com.example.aandi_post_web_server.course.entity.CourseEnrollment
+import com.example.aandi_post_web_server.course.entity.CourseMetadata
 import com.example.aandi_post_web_server.course.entity.CourseWeek
 import com.example.aandi_post_web_server.course.enum.CourseStatus
 import com.example.aandi_post_web_server.course.enum.EnrollmentStatus
@@ -74,11 +75,23 @@ class CourseCommandService(
         val slug = parseCourseSlug(courseSlug)
         return findCourseBySlug(slug)
             .flatMap { course ->
+                val updatedStartDate = request.startDate ?: course.startDate
+                val updatedEndDate = request.endDate ?: course.endDate
+                if (updatedEndDate.isBefore(updatedStartDate)) {
+                    return@flatMap Mono.error(ResponseStatusException(HttpStatus.BAD_REQUEST, "endDate는 startDate보다 빠를 수 없습니다."))
+                }
                 val updated = course.copy(
-                    title = request.title?.trim()?.takeIf { it.isNotBlank() } ?: course.title,
-                    description = request.description?.trim() ?: course.description,
-                    phase = request.phase ?: course.phase,
-                    targetTrack = request.targetTrack ?: course.targetTrack,
+                    fieldTag = request.fieldTag ?: course.fieldTag,
+                    startDate = updatedStartDate,
+                    endDate = updatedEndDate,
+                    metadata = request.metadata?.let {
+                        CourseMetadata(
+                            title = it.title.trim(),
+                            description = it.description?.trim(),
+                            phase = it.phase,
+                            attributes = it.attributes,
+                        )
+                    } ?: course.metadata,
                     status = request.status ?: course.status,
                     updatedAt = Instant.now(),
                 )
@@ -235,6 +248,9 @@ class CourseCommandService(
     ): Mono<AssignmentDetailResponse> {
         val slug = parseCourseSlug(courseSlug)
         val weekNo = parseWeekNo(request.weekNo)
+        if (request.endAt.isBefore(request.startAt)) {
+            return Mono.error(ResponseStatusException(HttpStatus.BAD_REQUEST, "endAt은 startAt보다 빠를 수 없습니다."))
+        }
         val requirementDrafts = parseRequirementDrafts(request.requirements)
         val exampleDrafts = parseExampleDrafts(request.examples)
 
@@ -243,7 +259,7 @@ class CourseCommandService(
                 val courseId = parseCourseId(requireNotNull(course.id))
                 ensureWeekExists(courseId, weekNo)
                     .then(
-                        assignmentRepository.findByCourseIdAndWeekNoAndSeqInWeek(courseId.value, weekNo.value, request.seqInWeek)
+                        assignmentRepository.findByCourseIdAndWeekNoAndOrderInWeek(courseId.value, weekNo.value, request.orderInWeek)
                             .flatMap<AssignmentDetailResponse> {
                                 Mono.error(
                                     ResponseStatusException(
@@ -259,13 +275,17 @@ class CourseCommandService(
                                         courseSlug = course.slug,
                                         createdBy = createdBy,
                                         weekNo = weekNo.value,
-                                        seqInWeek = request.seqInWeek,
-                                        title = request.title.trim(),
-                                        difficulty = request.difficulty,
-                                        contentMd = request.contentMd,
-                                        timeLimitMinutes = request.timeLimitMinutes,
-                                        openAt = request.openAt,
-                                        dueAt = request.dueAt,
+                                        orderInWeek = request.orderInWeek,
+                                        startAt = request.startAt,
+                                        endAt = request.endAt,
+                                        metadata = com.example.aandi_post_web_server.assignment.entity.AssignmentMetadata(
+                                            title = request.metadata.title.trim(),
+                                            difficulty = request.metadata.difficulty,
+                                            description = request.metadata.description.trim(),
+                                            timeLimitMinutes = request.metadata.timeLimitMinutes,
+                                            learningGoals = request.metadata.learningGoals.map { it.trim() },
+                                            attributes = request.metadata.attributes,
+                                        ),
                                         status = AssignmentStatus.DRAFT,
                                         createdAt = Instant.now(),
                                         updatedAt = Instant.now(),
@@ -320,13 +340,21 @@ class CourseCommandService(
     }
 
     private fun createCourseEntity(request: CreateCourseRequest, slug: CourseSlug): Mono<CourseResponse> {
+        if (request.endDate.isBefore(request.startDate)) {
+            return Mono.error(ResponseStatusException(HttpStatus.BAD_REQUEST, "endDate는 startDate보다 빠를 수 없습니다."))
+        }
         val now = Instant.now()
         val course = Course(
-            title = request.title.trim(),
             slug = slug.value,
-            description = request.description?.trim(),
-            phase = request.phase,
-            targetTrack = request.targetTrack,
+            fieldTag = request.fieldTag,
+            startDate = request.startDate,
+            endDate = request.endDate,
+            metadata = CourseMetadata(
+                title = request.metadata.title.trim(),
+                description = request.metadata.description?.trim(),
+                phase = request.metadata.phase,
+                attributes = request.metadata.attributes,
+            ),
             status = CourseStatus.ACTIVE,
             createdAt = now,
             updatedAt = now,
@@ -521,11 +549,16 @@ class CourseCommandService(
 
     private fun toCourseResponse(course: Course): CourseResponse = CourseResponse(
         id = requireNotNull(course.id),
-        title = course.title,
         slug = course.slug,
-        description = course.description,
-        phase = course.phase,
-        targetTrack = course.targetTrack,
+        fieldTag = course.fieldTag,
+        startDate = course.startDate,
+        endDate = course.endDate,
+        metadata = com.example.aandi_post_web_server.course.dtos.CourseMetadataResponse(
+            title = course.metadata.title,
+            description = course.metadata.description,
+            phase = course.metadata.phase,
+            attributes = course.metadata.attributes,
+        ),
         status = course.status,
         createdAt = course.createdAt,
         updatedAt = course.updatedAt,
@@ -561,15 +594,19 @@ class CourseCommandService(
         id = requireNotNull(assignment.id),
         courseSlug = courseSlug,
         weekNo = assignment.weekNo,
-        seqInWeek = assignment.seqInWeek,
-        title = assignment.title,
-        difficulty = assignment.difficulty,
-        contentMd = assignment.contentMd,
-        timeLimitMinutes = assignment.timeLimitMinutes,
-        openAt = assignment.openAt,
-        dueAt = assignment.dueAt,
+        orderInWeek = assignment.orderInWeek,
+        startAt = assignment.startAt,
+        endAt = assignment.endAt,
         status = assignment.status,
         publishedAt = assignment.publishedAt,
+        metadata = com.example.aandi_post_web_server.assignment.dtos.AssignmentMetadataResponse(
+            title = assignment.metadata.title,
+            difficulty = assignment.metadata.difficulty,
+            description = assignment.metadata.description,
+            timeLimitMinutes = assignment.metadata.timeLimitMinutes,
+            learningGoals = assignment.metadata.learningGoals,
+            attributes = assignment.metadata.attributes,
+        ),
         requirements = requirements,
         examples = examples,
     )

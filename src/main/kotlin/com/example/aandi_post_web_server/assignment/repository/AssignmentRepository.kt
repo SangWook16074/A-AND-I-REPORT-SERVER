@@ -8,7 +8,7 @@ import reactor.core.publisher.Mono
 
 interface AssignmentRepository : ReactiveMongoRepository<Assignment, String> {
     fun findByIdAndCourseId(id: String, courseId: String): Mono<Assignment>
-    fun findByCourseIdAndWeekNoAndSeqInWeek(courseId: String, weekNo: Int, seqInWeek: Int): Mono<Assignment>
+    fun findByCourseIdAndWeekNoAndOrderInWeek(courseId: String, weekNo: Int, orderInWeek: Int): Mono<Assignment>
     fun findAllByIdIn(ids: Collection<String>): Flux<Assignment>
     fun findAllByCourseId(courseId: String): Flux<Assignment>
     fun findAllByCourseIdAndStatus(courseId: String, status: AssignmentStatus): Flux<Assignment>
