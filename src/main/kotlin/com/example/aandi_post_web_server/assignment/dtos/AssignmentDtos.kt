@@ -105,9 +105,9 @@ data class CreateAssignmentRequest(
     @field:Min(1)
     @field:Schema(description = "주차 내 순서", example = "1")
     val orderInWeek: Int,
-    @field:Schema(description = "시작 시각(UTC)", example = "2026-03-03T00:00:00Z")
+    @field:Schema(description = "시작 시각(KST(Asia/Seoul))", example = "2026-03-03T09:00:00+09:00")
     val startAt: Instant,
-    @field:Schema(description = "종료 시각(UTC)", example = "2026-03-10T23:59:59Z")
+    @field:Schema(description = "종료 시각(KST(Asia/Seoul))", example = "2026-03-11T08:59:59+09:00")
     val endAt: Instant,
     @field:Schema(description = "과제 메타데이터")
     val metadata: AssignmentMetadataPayload,
@@ -235,9 +235,9 @@ data class AssignmentSummaryResponse(
     val weekNo: Int,
     @field:Schema(description = "주차 내 순서", example = "1")
     val orderInWeek: Int,
-    @field:Schema(description = "시작 시각(UTC)")
+    @field:Schema(description = "시작 시각(KST(Asia/Seoul))")
     val startAt: Instant,
-    @field:Schema(description = "종료 시각(UTC)")
+    @field:Schema(description = "종료 시각(KST(Asia/Seoul))")
     val endAt: Instant,
     @field:Schema(description = "과제 상태", example = "PUBLISHED")
     val status: AssignmentStatus,
@@ -260,11 +260,11 @@ data class AssignmentSummaryResponse(
     val level: LegacyAssignmentLevel
         get() = metadata.difficulty.toLegacyLevel()
 
-    @get:Schema(description = "오픈 시각(레거시: startAt, UTC)")
+    @get:Schema(description = "오픈 시각(레거시: startAt, KST(Asia/Seoul))")
     val openAt: Instant
         get() = startAt
 
-    @get:Schema(description = "마감 시각(레거시: endAt, UTC)")
+    @get:Schema(description = "마감 시각(레거시: endAt, KST(Asia/Seoul))")
     val dueAt: Instant
         get() = endAt
 
@@ -287,13 +287,13 @@ data class AssignmentDetailResponse(
     val weekNo: Int,
     @field:Schema(description = "주차 내 순서", example = "1")
     val orderInWeek: Int,
-    @field:Schema(description = "시작 시각(UTC)")
+    @field:Schema(description = "시작 시각(KST(Asia/Seoul))")
     val startAt: Instant,
-    @field:Schema(description = "종료 시각(UTC)")
+    @field:Schema(description = "종료 시각(KST(Asia/Seoul))")
     val endAt: Instant,
     @field:Schema(description = "과제 상태", example = "DRAFT")
     val status: AssignmentStatus,
-    @field:Schema(description = "게시 시각(UTC)")
+    @field:Schema(description = "게시 시각(KST(Asia/Seoul))")
     val publishedAt: Instant?,
     @field:Schema(description = "과제 메타데이터")
     val metadata: AssignmentMetadataResponse,
@@ -374,11 +374,11 @@ data class AssignmentDetailResponse(
     val timeLimitMinutes: Int
         get() = metadata.timeLimitMinutes
 
-    @get:Schema(description = "오픈 시각(레거시: startAt, UTC)")
+    @get:Schema(description = "오픈 시각(레거시: startAt, KST(Asia/Seoul))")
     val openAt: Instant
         get() = startAt
 
-    @get:Schema(description = "마감 시각(레거시: endAt, UTC)")
+    @get:Schema(description = "마감 시각(레거시: endAt, KST(Asia/Seoul))")
     val dueAt: Instant
         get() = endAt
 
@@ -403,7 +403,7 @@ data class PublishAssignmentResponse(
     val courseSlug: String,
     @field:Schema(description = "게시 후 상태", example = "PUBLISHED")
     val status: AssignmentStatus,
-    @field:Schema(description = "게시 시각(UTC)")
+    @field:Schema(description = "게시 시각(KST(Asia/Seoul))")
     val publishedAt: Instant?,
 )
 
@@ -427,7 +427,7 @@ data class AssignmentDeliveryResponse(
     val userId: String,
     @field:Schema(description = "배포 상태", example = "DELIVERED")
     val status: AssignmentDeliveryStatus,
-    @field:Schema(description = "배포 시각(UTC)")
+    @field:Schema(description = "배포 시각(KST(Asia/Seoul))")
     val deliveredAt: Instant?,
     @field:Schema(description = "실패 사유")
     val failureReason: String?,

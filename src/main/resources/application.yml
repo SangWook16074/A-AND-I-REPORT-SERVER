@@ -3,6 +3,8 @@ spring:
     name: aandi_post_web_server
   config:
     import: optional:file:.env[.properties]
+  jackson:
+    time-zone: Asia/Seoul
 
   data:
     mongodb:

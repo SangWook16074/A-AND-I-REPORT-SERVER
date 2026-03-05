@@ -105,9 +105,9 @@ data class CourseResponse(
     val metadata: CourseMetadataResponse,
     @field:Schema(description = "코스 상태", example = "ACTIVE")
     val status: CourseStatus,
-    @field:Schema(description = "생성 시각(UTC)", example = "2026-03-01T00:00:00Z")
+    @field:Schema(description = "생성 시각(KST(Asia/Seoul))", example = "2026-03-01T09:00:00+09:00")
     val createdAt: Instant,
-    @field:Schema(description = "수정 시각(UTC)", example = "2026-03-01T00:00:00Z")
+    @field:Schema(description = "수정 시각(KST(Asia/Seoul))", example = "2026-03-01T09:00:00+09:00")
     val updatedAt: Instant,
 ) {
     constructor(
@@ -177,15 +177,15 @@ data class CourseEnrollmentResponse(
     val userId: String,
     @field:Schema(description = "수강 상태", example = "ENROLLED")
     val status: EnrollmentStatus,
-    @field:Schema(description = "등록 시각(UTC)", example = "2026-03-01T00:00:00Z")
+    @field:Schema(description = "등록 시각(KST(Asia/Seoul))", example = "2026-03-01T09:00:00+09:00")
     val joinedAt: Instant,
-    @field:Schema(description = "중도 포기 시각(UTC)")
+    @field:Schema(description = "중도 포기 시각(KST(Asia/Seoul))")
     val droppedAt: Instant?,
-    @field:Schema(description = "강제 제외 시각(UTC)")
+    @field:Schema(description = "강제 제외 시각(KST(Asia/Seoul))")
     val bannedAt: Instant?,
     @field:Schema(description = "강제 제외 사유")
     val banReason: String?,
-    @field:Schema(description = "최종 변경 시각(UTC)", example = "2026-03-02T00:00:00Z")
+    @field:Schema(description = "최종 변경 시각(KST(Asia/Seoul))", example = "2026-03-02T09:00:00+09:00")
     val updatedAt: Instant,
 )
 
@@ -215,8 +215,8 @@ data class CourseWeekResponse(
     val startDate: LocalDate?,
     @field:Schema(description = "종료일")
     val endDate: LocalDate?,
-    @field:Schema(description = "생성 시각(UTC)", example = "2026-03-01T00:00:00Z")
+    @field:Schema(description = "생성 시각(KST(Asia/Seoul))", example = "2026-03-01T09:00:00+09:00")
     val createdAt: Instant,
-    @field:Schema(description = "수정 시각(UTC)", example = "2026-03-01T00:00:00Z")
+    @field:Schema(description = "수정 시각(KST(Asia/Seoul))", example = "2026-03-01T09:00:00+09:00")
     val updatedAt: Instant,
 )
