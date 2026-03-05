@@ -48,7 +48,7 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
 
         "코스 조회 API는 토큰이 없으면 401을 반환한다" {
             webTestClient.get()
-                .uri("/v1/courses")
+                .uri("/v2/report/courses")
                 .exchange()
                 .expectStatus().isUnauthorized
         }
@@ -63,7 +63,7 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                     jwt.subject(userId)
                 }.authorities(SimpleGrantedAuthority("ROLE_USER")),
             ).get()
-                .uri("/v1/courses")
+                .uri("/v2/report/courses")
                 .exchange()
                 .expectStatus().isOk
                 .expectBody()
@@ -72,7 +72,7 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
 
         "과제 상세 조회 API는 토큰이 없으면 401을 반환한다" {
             webTestClient.get()
-                .uri("/v1/courses/back-basic/assignments/assignment-1")
+                .uri("/v2/report/courses/back-basic/assignments/assignment-1")
                 .exchange()
                 .expectStatus().isUnauthorized
         }
@@ -88,7 +88,7 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                     jwt.subject(userId)
                 }.authorities(SimpleGrantedAuthority("ROLE_USER")),
             ).get()
-                .uri("/v1/courses/back-basic/assignments/assignment-1")
+                .uri("/v2/report/courses/back-basic/assignments/assignment-1")
                 .exchange()
                 .expectStatus().isOk
                 .expectBody()
@@ -106,7 +106,7 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                     jwt.subject(userId)
                 }.authorities(SimpleGrantedAuthority("ROLE_USER")),
             ).get()
-                .uri("/v1/courses/assignments/assignment-1/course")
+                .uri("/v2/report/courses/assignments/assignment-1/course")
                 .exchange()
                 .expectStatus().isOk
                 .expectBody()
@@ -130,7 +130,7 @@ class CourseApiRoutingWebFluxTest : StringSpec() {
                     jwt.subject(userId)
                 }.authorities(SimpleGrantedAuthority("ROLE_USER")),
             ).get()
-                .uri("/v1/courses?track=FL")
+                .uri("/v2/report/courses?track=FL")
                 .exchange()
                 .expectStatus().isOk
                 .expectBody()

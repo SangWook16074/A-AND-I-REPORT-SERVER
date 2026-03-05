@@ -29,7 +29,7 @@ import reactor.core.publisher.Mono
 
 @Tag(name = "코스 조회 API", description = "트랙/과정/코스/과제 조회 API")
 @RestController
-@RequestMapping("/v1/courses")
+@RequestMapping("/v2/report/courses")
 class CourseQueryV1Controller(
     private val courseV1Service: CourseV1Service,
 ) {
